@@ -75,18 +75,18 @@ body {
 }
 
 .item-coffee {
-  background: #8B4513;
-  color: white;
+  background: #f5f5dc;
+  color: #333;
 }
 
 .item-croissant {
-  background: #F4A460;
-  color: black;
+  background: #f5f5dc;
+  color: #333;
 }
 
 .item-generator {
-  background: #2F4F4F;
-  color: white;
+  background: #f5f5dc;
+  color: #333;
   border: 2px solid gold;
 }
 

@@ -28,11 +28,6 @@ export const Item: React.FC<ItemProps> = ({ item, onClick, isSelected, isRequire
         opacity: isDragging ? 0.8 : 1,
         border: isSelected ? '3px solid #646cff' : undefined,
         boxShadow: isSelected ? '0 0 10px rgba(100, 108, 255, 0.5)' : undefined,
-
-        backgroundColor: (item.type === 'generator_coffee' || item.type === 'coffee') ? '#3e2723' :
-            (item.type === 'generator_bakery' || item.type === 'croissant') ? '#ffecb3' : undefined,
-        color: (item.type === 'generator_coffee' || item.type === 'coffee') ? '#d7ccc8' :
-            (item.type === 'generator_bakery' || item.type === 'croissant') ? '#5d4037' : undefined,
         touchAction: 'none',
     };
 
@@ -89,6 +84,9 @@ export const Item: React.FC<ItemProps> = ({ item, onClick, isSelected, isRequire
         return null;
     };
 
+    const [imageError, setImageError] = React.useState(false);
+    const imagePath = `/experiment-merge2/items/${item.type}-${item.level}.png`;
+
     return (
         <div
             ref={setNodeRef}
@@ -98,7 +96,19 @@ export const Item: React.FC<ItemProps> = ({ item, onClick, isSelected, isRequire
             className={getClassName()}
             onClick={onClick}
         >
-            {renderIcon()}
+            {!imageError ? (
+                <img
+                    src={imagePath}
+                    alt={item.type}
+                    style={{ width: '85%', height: '85%', objectFit: 'contain', pointerEvents: 'none' }}
+                    onError={() => setImageError(true)}
+                />
+            ) : (
+                renderIcon()
+            )}
+            {item.type.startsWith('generator') && (
+                <Zap size={16} style={{ position: 'absolute', top: 2, right: 2, fill: 'gold', color: 'gold' }} />
+            )}
             <span style={{ position: 'absolute', bottom: 2, right: 4, fontSize: '10px' }}>{item.level}</span>
             {isRequired && (
                 <div style={{
