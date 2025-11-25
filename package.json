@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "homepage": "https://xli2022.github.io/merge2",
+  "homepage": "https://xli2022.github.io/experiment-merge2",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
