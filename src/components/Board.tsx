@@ -3,6 +3,7 @@ import { DndContext, type DragEndEvent, useSensor, useSensors, PointerSensor } f
 import { useGameStore } from '../store/gameStore';
 import { Cell } from './Cell';
 import { OrderBoard } from './OrderBoard';
+import { BakeryRenovation } from './BakeryRenovation';
 
 
 export const Board: React.FC = () => {
@@ -43,14 +44,34 @@ export const Board: React.FC = () => {
     };
 
     return (
-        <div>
-            <div className="stats-bar">
-                <div>Energy: {energy}</div>
-                <div>Coins: {coins}</div>
+        <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100vh',
+            maxWidth: '500px', // Simulate mobile width on desktop
+            margin: '0 auto',
+            padding: '10px',
+            boxSizing: 'border-box',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            overflow: 'hidden'
+        }}>
+            <div className="stats-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', fontWeight: 'bold' }}>
+                <div style={{ background: '#e3f2fd', padding: '5px 10px', borderRadius: '15px', color: '#1565c0' }}>⚡ {energy}</div>
+                <div style={{ fontSize: '16px', color: '#212529', fontWeight: 'bold' }}>Bakery Merge</div>
+                <div style={{ background: '#fff8e1', padding: '5px 10px', borderRadius: '15px', color: '#f57f17' }}>💰 {coins}</div>
             </div>
-            <OrderBoard />
+
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'stretch', height: '160px' }}>
+                <div style={{ flex: '0 0 140px' }}>
+                    <BakeryRenovation />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <OrderBoard />
+                </div>
+            </div>
+
             <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-                <div className="game-board">
+                <div className="game-board" style={{ marginBottom: '10px' }}>
                     {grid.map((cell) => (
                         <Cell key={cell.id} cell={cell} />
                     ))}

@@ -5,7 +5,8 @@ import { CSS } from '@dnd-kit/utilities';
 import {
     Coffee, Croissant, Zap, Check,
     Circle, CupSoda, Milk, ShoppingBag, Package,
-    Wheat, Egg, Cookie, Sandwich, Cake
+    Wheat, Egg, Cookie, Sandwich, Cake,
+    Factory, CookingPot
 } from 'lucide-react';
 
 interface ItemProps {
@@ -69,7 +70,7 @@ export const Item: React.FC<ItemProps> = ({ item, onClick, isSelected, isRequire
         if (item.type === 'generator_coffee') {
             return (
                 <div style={{ position: 'relative' }}>
-                    <Coffee size={size} />
+                    <Factory size={size} />
                     <Zap size={16} style={{ position: 'absolute', top: -5, right: -10, fill: 'gold', color: 'gold' }} />
                 </div>
             );
@@ -78,7 +79,7 @@ export const Item: React.FC<ItemProps> = ({ item, onClick, isSelected, isRequire
         if (item.type === 'generator_bakery') {
             return (
                 <div style={{ position: 'relative' }}>
-                    <Croissant size={size} />
+                    <CookingPot size={size} />
                     <Zap size={16} style={{ position: 'absolute', top: -5, right: -10, fill: 'gold', color: 'gold' }} />
                 </div>
             );

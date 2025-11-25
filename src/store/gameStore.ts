@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { type GameState, type GridCell, type ItemType, type Order, MERGE_CHAINS } from '../types/game';
+import { type GameState, type GridCell, type ItemType, type Order, type Upgrade, MERGE_CHAINS } from '../types/game';
 
 
 
@@ -13,7 +13,16 @@ interface GameStore extends GameState {
     generateOrder: () => void;
     completeOrder: (orderId: string) => void;
     restoreEnergy: (amount: number) => void;
+    purchaseUpgrade: (upgradeId: string) => void;
 }
+
+const INITIAL_UPGRADES: Upgrade[] = [
+    { id: 'u1', name: 'Clean Floor', cost: 50, description: 'Sweep away the dust.', purchased: false },
+    { id: 'u2', name: 'Fix Counter', cost: 150, description: 'A sturdy place to work.', purchased: false },
+    { id: 'u3', name: 'New Sign', cost: 300, description: 'Attract more customers.', purchased: false },
+    { id: 'u4', name: 'Espresso Machine', cost: 500, description: 'Shiny and chrome.', purchased: false },
+    { id: 'u5', name: 'Display Case', cost: 800, description: 'Show off your pastries.', purchased: false },
+];
 
 const createGrid = (rows: number, cols: number): GridCell[] => {
     const grid: GridCell[] = [];
@@ -40,6 +49,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     xp: 0,
     selectedItemId: null,
     orders: [],
+    upgrades: INITIAL_UPGRADES,
 
     initGrid: (rows, cols) => {
         // Initialize with some starter items
@@ -224,6 +234,23 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const { energy, maxEnergy } = get();
         if (energy < maxEnergy) {
             set({ energy: Math.min(energy + amount, maxEnergy) });
+        }
+    },
+
+    purchaseUpgrade: (upgradeId) => {
+        const { coins, upgrades } = get();
+        const upgradeIndex = upgrades.findIndex(u => u.id === upgradeId);
+        if (upgradeIndex === -1) return;
+
+        const upgrade = upgrades[upgradeIndex];
+        if (coins >= upgrade.cost && !upgrade.purchased) {
+            const newUpgrades = [...upgrades];
+            newUpgrades[upgradeIndex] = { ...upgrade, purchased: true };
+
+            set({
+                coins: coins - upgrade.cost,
+                upgrades: newUpgrades
+            });
         }
     },
 }));

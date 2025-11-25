@@ -20,6 +20,14 @@ export interface Order {
     reward: { coins: number; xp: number };
 }
 
+export interface Upgrade {
+    id: string;
+    name: string;
+    cost: number;
+    description: string;
+    purchased: boolean;
+}
+
 export interface GameState {
     grid: GridCell[];
     energy: number;
@@ -30,6 +38,7 @@ export interface GameState {
     xp: number;
     selectedItemId: string | null;
     orders: Order[];
+    upgrades: Upgrade[];
 }
 
 export const MERGE_CHAINS: Record<ItemType, { maxLevel: number; name: string }> = {
