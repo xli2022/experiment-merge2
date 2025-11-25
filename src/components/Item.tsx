@@ -33,6 +33,7 @@ export const Item: React.FC<ItemProps> = ({ item, onClick, isSelected, isRequire
             (item.type === 'generator_bakery' || item.type === 'croissant') ? '#ffecb3' : undefined,
         color: (item.type === 'generator_coffee' || item.type === 'coffee') ? '#d7ccc8' :
             (item.type === 'generator_bakery' || item.type === 'croissant') ? '#5d4037' : undefined,
+        touchAction: 'none',
     };
 
     const getClassName = () => {

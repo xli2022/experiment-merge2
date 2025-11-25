@@ -116,21 +116,27 @@ export const useGameStore = create<GameStore>((set, get) => ({
         set({ grid: newGrid });
     },
 
-    spawnItem: (_cellId, type) => {
+    spawnItem: (cellId, type) => {
         const { grid, energy, consumeEnergy } = get();
         if (energy <= 0) return;
 
-        // Find empty neighbor or just spawn in empty spot?
-        // Usually generators spawn in adjacent empty cells.
-        // For simplicity MVP: spawn in first empty cell.
+        const generatorCell = grid.find(c => c.id === cellId);
+        if (!generatorCell) return;
 
         const emptyCells = grid.filter(c => c.item === null);
         if (emptyCells.length === 0) return;
 
         if (consumeEnergy(1)) {
-            const randomCell = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+            // Find closest empty cell
+            const sortedCells = emptyCells.sort((a, b) => {
+                const distA = Math.abs(a.row - generatorCell.row) + Math.abs(a.col - generatorCell.col);
+                const distB = Math.abs(b.row - generatorCell.row) + Math.abs(b.col - generatorCell.col);
+                return distA - distB;
+            });
+
+            const targetCell = sortedCells[0];
             const newGrid = [...grid];
-            const cellIndex = newGrid.findIndex(c => c.id === randomCell.id);
+            const cellIndex = newGrid.findIndex(c => c.id === targetCell.id);
 
             newGrid[cellIndex].item = {
                 id: crypto.randomUUID(),
