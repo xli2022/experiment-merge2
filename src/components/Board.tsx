@@ -4,10 +4,16 @@ import { useGameStore } from '../store/gameStore';
 import { Cell } from './Cell';
 import { OrderBoard } from './OrderBoard';
 import { BakeryRenovation } from './BakeryRenovation';
+import { SpawnAnimation } from './SpawnAnimation';
+import { Notification } from './Notification';
+import { CoinAnimation } from './CoinAnimation';
+import { useAnimatedNumber } from '../hooks/useAnimatedNumber';
+import { ItemInfoPanel } from './ItemInfoPanel';
 
 
 export const Board: React.FC = () => {
-    const { grid, initGrid, moveItem, energy, coins, restoreEnergy } = useGameStore();
+    const { grid, initGrid, moveItem, energy, coins, restoreEnergy, spawnAnimations, coinAnimations } = useGameStore();
+    const animatedCoins = useAnimatedNumber(coins, 800); // Match coin flying animation duration
 
     useEffect(() => {
         initGrid(9, 7);
@@ -53,12 +59,13 @@ export const Board: React.FC = () => {
             padding: '10px',
             boxSizing: 'border-box',
             fontFamily: 'system-ui, -apple-system, sans-serif',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            position: 'relative',
         }}>
             <div className="stats-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', fontWeight: 'bold' }}>
-                <div style={{ background: '#e3f2fd', padding: '5px 10px', borderRadius: '15px', color: '#1565c0' }}>⚡ {energy}</div>
+                <div style={{ background: '#fff8e1', padding: '5px 10px', borderRadius: '15px', color: '#f57f17' }}>💰 {animatedCoins}</div>
                 <div style={{ fontSize: '16px', color: '#212529', fontWeight: 'bold' }}>Bakery Merge</div>
-                <div style={{ background: '#fff8e1', padding: '5px 10px', borderRadius: '15px', color: '#f57f17' }}>💰 {coins}</div>
+                <div style={{ background: '#e3f2fd', padding: '5px 10px', borderRadius: '15px', color: '#1565c0' }}>⚡ {energy}</div>
             </div>
 
             <div style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'stretch', height: '160px' }}>
@@ -71,12 +78,22 @@ export const Board: React.FC = () => {
             </div>
 
             <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-                <div className="game-board" style={{ marginBottom: '10px' }}>
+                <div className="game-board" style={{ marginBottom: '10px', position: 'relative' }}>
                     {grid.map((cell) => (
                         <Cell key={cell.id} cell={cell} />
                     ))}
+                    {/* Render spawn animations */}
+                    {spawnAnimations.map((animation) => (
+                        <SpawnAnimation key={animation.id} animation={animation} />
+                    ))}
                 </div>
             </DndContext>
+            <Notification />
+            {/* Render coin animations */}
+            {coinAnimations.map((animation) => (
+                <CoinAnimation key={animation.id} animation={animation} />
+            ))}
+            <ItemInfoPanel />
         </div>
     );
 };

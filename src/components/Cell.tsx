@@ -14,7 +14,9 @@ export const Cell: React.FC<CellProps> = ({ cell }) => {
         id: cell.id,
         data: cell,
     });
-    const { spawnItem, selectedItemId, setSelectedItem, orders } = useGameStore();
+    const { selectedItemId, setSelectedItem, spawnItem, orders } = useGameStore();
+    const isSelected = selectedItemId === cell.item?.id;
+    const wasSelectedRef = React.useRef(false);
 
     const isRequired = React.useMemo(() => {
         if (!cell.item) return false;
@@ -25,35 +27,51 @@ export const Cell: React.FC<CellProps> = ({ cell }) => {
         );
     }, [cell.item, orders]);
 
-    const handleItemClick = () => {
+    const handlePointerDown = () => {
         if (!cell.item) return;
+        wasSelectedRef.current = isSelected;
 
-        // If this item is already selected, "use" it
-        if (selectedItemId === cell.item.id) {
-            if (cell.item.type.startsWith('generator')) {
-                // Determine what to spawn based on generator type
-                const spawnType = cell.item.type === 'generator_coffee' ? 'coffee' : 'croissant';
-                spawnItem(cell.id, spawnType);
-            }
-            // Keep selected after use
-        } else {
-            // Select this item
+        if (!isSelected) {
             setSelectedItem(cell.item.id);
         }
     };
 
-    const style = {
-        backgroundColor: isOver ? 'rgba(0, 255, 0, 0.1)' : undefined,
+    const handleItemClick = () => {
+        if (!cell.item) return;
+
+        // Only spawn if it was ALREADY selected when we pressed down
+        if (wasSelectedRef.current && isSelected) {
+            if (cell.item.type.startsWith('generator')) {
+                // Determine what to spawn based on generator type
+                const spawnType = cell.item.type === 'generator_coffee' ? 'coffee' : 'bread';
+                spawnItem(cell.id, spawnType);
+            }
+        }
     };
 
     return (
-        <div ref={setNodeRef} className="cell" style={style}>
+        <div
+            ref={setNodeRef}
+            className={`cell ${isSelected ? 'selected' : ''}`}
+            style={{
+                width: '100%',
+                height: '100%',
+                backgroundColor: isOver ? 'rgba(0, 255, 0, 0.1)' : 'rgba(255, 255, 255, 0.8)',
+                borderRadius: '8px',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                position: 'relative',
+                boxShadow: isSelected ? 'inset 0 0 0 2px #2196f3' : 'none',
+            }}
+        >
             {cell.item && (
                 <Item
                     item={cell.item}
-                    onClick={handleItemClick}
-                    isSelected={selectedItemId === cell.item.id}
+                    isSelected={isSelected}
                     isRequired={isRequired}
+                    onClick={handleItemClick}
+                    onPointerDown={handlePointerDown}
                 />
             )}
         </div>

@@ -61,7 +61,28 @@ export const BakeryRenovation: React.FC = () => {
                 </div>
 
                 <button
-                    onClick={() => purchaseUpgrade(nextUpgrade.id)}
+                    ref={(el) => {
+                        if (el && coins >= nextUpgrade.cost) {
+                            el.onclick = () => {
+                                // Get button position (target for animation)
+                                const buttonRect = el.getBoundingClientRect();
+                                const toX = buttonRect.left + buttonRect.width / 2;
+                                const toY = buttonRect.top + buttonRect.height / 2;
+
+                                // Get coins display position (source for animation)
+                                const coinsElement = document.querySelector('.stats-bar > div:first-child');
+                                if (coinsElement) {
+                                    const coinsRect = coinsElement.getBoundingClientRect();
+                                    const fromX = coinsRect.left + coinsRect.width / 2;
+                                    const fromY = coinsRect.top + coinsRect.height / 2;
+
+                                    // Fly FROM coins TO button for spending
+                                    useGameStore.getState().addCoinAnimation(fromX, fromY, -nextUpgrade.cost, toX, toY);
+                                }
+                                purchaseUpgrade(nextUpgrade.id);
+                            };
+                        }
+                    }}
                     disabled={coins < nextUpgrade.cost}
                     style={{
                         padding: '4px 10px',

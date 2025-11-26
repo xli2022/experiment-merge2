@@ -3,7 +3,7 @@ import { useDraggable } from '@dnd-kit/core';
 import { type Item as ItemType } from '../types/game';
 import { CSS } from '@dnd-kit/utilities';
 import {
-    Coffee, Croissant, Zap, Check,
+    Coffee, Croissant as BreadIcon, Zap, Check,
     Circle, CupSoda, Milk, ShoppingBag, Package,
     Wheat, Egg, Cookie, Sandwich, Cake,
     Factory, CookingPot
@@ -12,11 +12,12 @@ import {
 interface ItemProps {
     item: ItemType;
     onClick?: () => void;
+    onPointerDown?: () => void;
     isSelected?: boolean;
     isRequired?: boolean;
 }
 
-export const Item: React.FC<ItemProps> = ({ item, onClick, isSelected, isRequired }) => {
+export const Item: React.FC<ItemProps> = ({ item, onClick, onPointerDown, isSelected, isRequired }) => {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: item.id,
         data: item,
@@ -51,15 +52,15 @@ export const Item: React.FC<ItemProps> = ({ item, onClick, isSelected, isRequire
             }
         }
 
-        if (item.type === 'croissant') {
+        if (item.type === 'bread') {
             switch (item.level) {
-                case 1: return <Wheat size={size} />; // Wheat
-                case 2: return <Egg size={size} />; // Egg
-                case 3: return <Cookie size={size} />; // Dough/Cookie
-                case 4: return <Croissant size={size} />; // Croissant
+                case 1: return <Wheat size={size} />; // Flour/Wheat
+                case 2: return <Egg size={size} />; // Dough/Egg
+                case 3: return <Cookie size={size} />; // Cookie
+                case 4: return <BreadIcon size={size} />; // Bread
                 case 5: return <Sandwich size={size} />; // Sandwich
                 case 6: return <Cake size={size} />; // Cake
-                default: return <Croissant size={size} />;
+                default: return <BreadIcon size={size} />;
             }
         }
 
@@ -72,7 +73,7 @@ export const Item: React.FC<ItemProps> = ({ item, onClick, isSelected, isRequire
             );
         }
 
-        if (item.type === 'generator_bakery') {
+        if (item.type === 'generator_bread') {
             return (
                 <div style={{ position: 'relative' }}>
                     <CookingPot size={size} />
@@ -95,6 +96,10 @@ export const Item: React.FC<ItemProps> = ({ item, onClick, isSelected, isRequire
             {...attributes}
             className={getClassName()}
             onClick={onClick}
+            onPointerDown={(e) => {
+                listeners?.onPointerDown(e);
+                if (onPointerDown) onPointerDown();
+            }}
         >
             {!imageError ? (
                 <img

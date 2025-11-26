@@ -32,9 +32,52 @@ export const OrderBoard: React.FC = () => {
     };
 
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+    const orderRefsMap = React.useRef<Map<string, HTMLDivElement>>(new Map());
     const [isDragging, setIsDragging] = React.useState(false);
     const [startX, setStartX] = React.useState(0);
     const [scrollLeft, setScrollLeft] = React.useState(0);
+    const previousAvailabilityRef = React.useRef<Map<string, number>>(new Map());
+
+    // Track changes in item availability and auto-scroll
+    useEffect(() => {
+        const ordersWithStatus = orders.map((order) => ({
+            order,
+            itemStatus: checkAvailability(order.items),
+        }))
+            // Sort by completion percentage (same as visual order)
+            .sort((a, b) => {
+                const aCompleted = a.itemStatus.filter(s => s).length;
+                const bCompleted = b.itemStatus.filter(s => s).length;
+                const aTotal = a.order.items.length;
+                const bTotal = b.order.items.length;
+                const aPercent = aCompleted / aTotal;
+                const bPercent = bCompleted / bTotal;
+                return bPercent - aPercent;
+            });
+
+        // Find the first order with a new match (based on visual order)
+        let foundFirstMatch = false;
+
+        ordersWithStatus.forEach(({ order, itemStatus }) => {
+            const matchedCount = itemStatus.filter(s => s).length;
+            const previousCount = previousAvailabilityRef.current.get(order.id) || 0;
+
+            // If we have a new match and haven't scrolled yet
+            if (matchedCount > previousCount && !foundFirstMatch) {
+                const orderElement = orderRefsMap.current.get(order.id);
+                if (orderElement) {
+                    orderElement.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'nearest',
+                        inline: 'center'
+                    });
+                    foundFirstMatch = true;
+                }
+            }
+
+            previousAvailabilityRef.current.set(order.id, matchedCount);
+        });
+    }, [grid, orders]);
 
     const handleMouseDown = (e: React.MouseEvent) => {
         // Don't start drag if clicking on a button or interactive element
@@ -117,15 +160,24 @@ export const OrderBoard: React.FC = () => {
                         const isComplete = itemStatus.every(s => s);
 
                         return (
-                            <div key={order.id} style={{
-                                border: '2px solid #ddd',
-                                borderRadius: '8px',
-                                padding: '10px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                minWidth: '120px'
-                            }}>
+                            <div
+                                key={order.id}
+                                ref={(el) => {
+                                    if (el) {
+                                        orderRefsMap.current.set(order.id, el);
+                                    } else {
+                                        orderRefsMap.current.delete(order.id);
+                                    }
+                                }}
+                                style={{
+                                    border: '2px solid #ddd',
+                                    borderRadius: '8px',
+                                    padding: '10px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    minWidth: '120px'
+                                }}>
                                 <div style={{ display: 'flex', gap: '5px', marginBottom: '5px' }}>
                                     {order.items.map((item, idx) => (
                                         <div key={idx} style={{ width: '40px', height: '40px', position: 'relative' }}>
@@ -137,11 +189,22 @@ export const OrderBoard: React.FC = () => {
                                     ))}
                                 </div>
                                 <div style={{ fontSize: '12px', color: '#666' }}>
-                                    Reward: {order.reward.coins} Coins
+                                    Reward: {order.reward.coins} 💰
                                 </div>
                                 <button
-                                    onClick={() => completeOrder(order.id)}
+                                    ref={(el) => {
+                                        if (el && isComplete) {
+                                            el.onclick = (e) => {
+                                                const rect = el.getBoundingClientRect();
+                                                const fromX = rect.left + rect.width / 2;
+                                                const fromY = rect.top + rect.height / 2;
+                                                useGameStore.getState().addCoinAnimation(fromX, fromY, order.reward.coins);
+                                                completeOrder(order.id);
+                                            };
+                                        }
+                                    }}
                                     disabled={!isComplete}
+
                                     style={{
                                         marginTop: '5px',
                                         padding: '4px 8px',

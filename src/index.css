@@ -79,7 +79,7 @@ body {
   color: #333;
 }
 
-.item-croissant {
+.item-bread {
   background: #f5f5dc;
   color: #333;
 }
@@ -98,4 +98,44 @@ body {
   background: white;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+@keyframes spawnFly {
+  0% {
+    transform: translate(0, 0) scale(0.8);
+    opacity: 0.8;
+  }
+
+  100% {
+    transform: translate(var(--delta-x), var(--delta-y)) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    transform: translate(-50%, calc(-50% - 20px));
+    opacity: 0;
+  }
+
+  to {
+    transform: translate(-50%, -50%);
+    opacity: 1;
+  }
+}
+
+@keyframes coinFly {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+
+  70% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: translate(calc(-50% + var(--target-x)), calc(-50% + var(--target-y))) scale(0.5);
+    opacity: 0;
+  }
 }

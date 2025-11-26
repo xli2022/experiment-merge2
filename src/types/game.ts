@@ -1,4 +1,4 @@
-export type ItemType = 'coffee' | 'croissant' | 'generator_coffee' | 'generator_bakery';
+export type ItemType = 'coffee' | 'bread' | 'generator_coffee' | 'generator_bread';
 
 export interface Item {
     id: string;
@@ -28,6 +28,30 @@ export interface Upgrade {
     purchased: boolean;
 }
 
+export interface SpawnAnimation {
+    id: string;
+    item: Item;
+    fromCellId: string;
+    toCellId: string;
+    startTime: number;
+}
+
+export interface Notification {
+    id: string;
+    message: string;
+    type: 'info' | 'warning' | 'error' | 'success';
+}
+
+export interface CoinAnimation {
+    id: string;
+    amount: number;
+    fromX: number;
+    fromY: number;
+    toX?: number;  // Optional explicit target position
+    toY?: number;
+    startTime: number;
+}
+
 export interface GameState {
     grid: GridCell[];
     energy: number;
@@ -39,11 +63,14 @@ export interface GameState {
     selectedItemId: string | null;
     orders: Order[];
     upgrades: Upgrade[];
+    spawnAnimations: SpawnAnimation[];
+    notification: Notification | null;
+    coinAnimations: CoinAnimation[];
 }
 
 export const MERGE_CHAINS: Record<ItemType, { maxLevel: number; name: string }> = {
     coffee: { maxLevel: 6, name: 'Coffee' },
-    croissant: { maxLevel: 6, name: 'Croissant' },
+    bread: { maxLevel: 6, name: 'Bread' },
     generator_coffee: { maxLevel: 1, name: 'Coffee Machine' },
-    generator_bakery: { maxLevel: 1, name: 'Oven' },
+    generator_bread: { maxLevel: 1, name: 'Bread Basket' },
 };

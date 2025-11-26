@@ -1,11 +1,12 @@
 import { create } from 'zustand';
-import { type GameState, type GridCell, type ItemType, type Order, type Upgrade, MERGE_CHAINS } from '../types/game';
+import { type GameState, type GridCell, type ItemType, type Order, type Upgrade, type SpawnAnimation, type Notification, type CoinAnimation, MERGE_CHAINS } from '../types/game';
 
 
 
 interface GameStore extends GameState {
     initGrid: (rows: number, cols: number) => void;
     moveItem: (fromId: string, toId: string) => void;
+    deleteItem: (itemId: string) => void;
     spawnItem: (cellId: string, type: ItemType) => void;
     consumeEnergy: (amount: number) => boolean;
     addCurrency: (type: 'coins' | 'gems', amount: number) => void;
@@ -14,6 +15,12 @@ interface GameStore extends GameState {
     completeOrder: (orderId: string) => void;
     restoreEnergy: (amount: number) => void;
     purchaseUpgrade: (upgradeId: string) => void;
+    addSpawnAnimation: (animation: SpawnAnimation) => void;
+    removeSpawnAnimation: (id: string) => void;
+    showNotification: (message: string, type: Notification['type']) => void;
+    clearNotification: () => void;
+    addCoinAnimation: (fromX: number, fromY: number, amount: number, toX?: number, toY?: number) => void;
+    removeCoinAnimation: (id: string) => void;
 }
 
 const INITIAL_UPGRADES: Upgrade[] = [
@@ -50,6 +57,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
     selectedItemId: null,
     orders: [],
     upgrades: INITIAL_UPGRADES,
+    spawnAnimations: [],
+    notification: null,
+    coinAnimations: [],
 
     initGrid: (rows, cols) => {
         // Initialize with some starter items
@@ -65,7 +75,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         };
         grid[centerIndex + 1].item = {
             id: 'gen-2',
-            type: 'generator_bakery',
+            type: 'generator_bread',
             level: 1,
             maxLevel: 1,
         };
@@ -103,6 +113,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 id: crypto.randomUUID(), // New ID for merged item
             };
             fromCell.item = null;
+            // Select the newly merged item
+            set({ selectedItemId: toCell.item.id });
             // TODO: Add XP or other merge effects
         }
         // Case 3: Swap (if not merging and not empty) - Optional, usually games just swap or bounce back
@@ -117,13 +129,21 @@ export const useGameStore = create<GameStore>((set, get) => ({
     },
 
     spawnItem: (cellId, type) => {
-        const { grid, energy, consumeEnergy } = get();
-        if (energy <= 0) return;
+        const { grid, energy, consumeEnergy, addSpawnAnimation, spawnAnimations, showNotification } = get();
+
+        if (energy <= 0) {
+            showNotification('⚡ Out of energy! Wait for it to recharge.', 'warning');
+            return;
+        }
 
         const generatorCell = grid.find(c => c.id === cellId);
         if (!generatorCell) return;
 
-        const emptyCells = grid.filter(c => c.item === null);
+        // Get cells that have pending spawns
+        const pendingSpawnCellIds = new Set(spawnAnimations.map(a => a.toCellId));
+
+        // Find empty cells that don't have pending spawns
+        const emptyCells = grid.filter(c => c.item === null && !pendingSpawnCellIds.has(c.id));
         if (emptyCells.length === 0) return;
 
         if (consumeEnergy(1)) {
@@ -135,17 +155,38 @@ export const useGameStore = create<GameStore>((set, get) => ({
             });
 
             const targetCell = sortedCells[0];
-            const newGrid = [...grid];
-            const cellIndex = newGrid.findIndex(c => c.id === targetCell.id);
-
-            newGrid[cellIndex].item = {
+            const newItem = {
                 id: crypto.randomUUID(),
                 type,
                 level: 1,
                 maxLevel: MERGE_CHAINS[type].maxLevel,
             };
 
-            set({ grid: newGrid });
+            // Create animation
+            const animation = {
+                id: crypto.randomUUID(),
+                item: newItem,
+                fromCellId: cellId,
+                toCellId: targetCell.id,
+                startTime: Date.now(),
+            };
+
+            addSpawnAnimation(animation);
+
+            // Add item to grid after animation completes (400ms)
+            setTimeout(() => {
+                const currentGrid = get().grid;
+                const newGrid = [...currentGrid];
+                const cellIndex = newGrid.findIndex(c => c.id === targetCell.id);
+
+                if (cellIndex !== -1 && !newGrid[cellIndex].item) {
+                    newGrid[cellIndex].item = newItem;
+                    set({ grid: newGrid });
+                }
+
+                // Remove animation
+                get().removeSpawnAnimation(animation.id);
+            }, 400);
         }
     },
 
@@ -162,8 +203,23 @@ export const useGameStore = create<GameStore>((set, get) => ({
         set((state) => ({ [type]: state[type] + amount }));
     },
 
-    setSelectedItem: (id) => {
-        set({ selectedItemId: id });
+    setSelectedItem: (itemId) => {
+        set({ selectedItemId: itemId });
+    },
+
+    deleteItem: (itemId) => {
+        const { grid, selectedItemId } = get();
+        const cell = grid.find(c => c.item?.id === itemId);
+
+        if (cell) {
+            const newGrid = [...grid];
+            const cellIndex = newGrid.findIndex(c => c.id === cell.id);
+            newGrid[cellIndex] = { ...newGrid[cellIndex], item: null };
+            set({
+                grid: newGrid,
+                selectedItemId: selectedItemId === itemId ? null : selectedItemId
+            });
+        }
     },
 
     generateOrder: () => {
@@ -177,7 +233,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         let totalRewardXp = 0;
 
         for (let i = 0; i < numItems; i++) {
-            const types: ItemType[] = ['coffee', 'croissant'];
+            const types: ItemType[] = ['coffee', 'bread'];
             const type = types[Math.floor(Math.random() * types.length)];
             const level = Math.floor(Math.random() * 3) + 1; // Level 1-3
             items.push({ type, level });
@@ -258,5 +314,49 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 upgrades: newUpgrades
             });
         }
+    },
+
+    addSpawnAnimation: (animation) => {
+        set((state) => ({
+            spawnAnimations: [...state.spawnAnimations, animation]
+        }));
+    },
+
+    removeSpawnAnimation: (id) => {
+        set((state) => ({
+            spawnAnimations: state.spawnAnimations.filter(a => a.id !== id)
+        }));
+    },
+
+    showNotification: (message, type) => {
+        const id = crypto.randomUUID();
+        set({ notification: { id, message, type } });
+
+        // Auto-clear after 3 seconds
+        setTimeout(() => {
+            set((state) => state.notification?.id === id ? { notification: null } : {});
+        }, 3000);
+    },
+
+    clearNotification: () => {
+        set({ notification: null });
+    },
+
+    addCoinAnimation: (fromX, fromY, amount, toX, toY) => {
+        const id = crypto.randomUUID();
+        set((state) => ({
+            coinAnimations: [...state.coinAnimations, { id, fromX, fromY, amount, toX, toY, startTime: Date.now() }]
+        }));
+
+        // Remove animation after it completes (800ms)
+        setTimeout(() => {
+            get().removeCoinAnimation(id);
+        }, 800);
+    },
+
+    removeCoinAnimation: (id) => {
+        set((state) => ({
+            coinAnimations: state.coinAnimations.filter(a => a.id !== id)
+        }));
     },
 }));
