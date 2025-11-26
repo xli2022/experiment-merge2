@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { type GameState, type GridCell, type ItemType, type Order, type Upgrade, type SpawnAnimation, type Notification, type CoinAnimation, MERGE_CHAINS } from '../types/game';
+import { type GameState, type GridCell, type ItemType, type Order, type Upgrade, type SpawnAnimation, type Notification, MERGE_CHAINS } from '../types/game';
 
 
 

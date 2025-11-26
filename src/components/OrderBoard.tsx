@@ -194,7 +194,8 @@ export const OrderBoard: React.FC = () => {
                                 <button
                                     ref={(el) => {
                                         if (el && isComplete) {
-                                            el.onclick = (e) => {
+                                            el.onclick = () => {
+                                                // Get button position (target for animation)
                                                 const rect = el.getBoundingClientRect();
                                                 const fromX = rect.left + rect.width / 2;
                                                 const fromY = rect.top + rect.height / 2;
