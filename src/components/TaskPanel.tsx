@@ -2,14 +2,20 @@ import React from 'react';
 import { useGameStore } from '../store/gameStore';
 
 
-export const BakeryRenovation: React.FC = () => {
-    const { upgrades, coins, purchaseUpgrade } = useGameStore();
+export const TaskPanel: React.FC = () => {
+    const { tasks, coins, level, xp, completeTask } = useGameStore();
 
-    const nextUpgradeIndex = upgrades.findIndex(u => !u.purchased);
-    const nextUpgrade = upgrades[nextUpgradeIndex];
-    const progress = Math.round((upgrades.filter(u => u.purchased).length / upgrades.length) * 100);
+    const nextTaskIndex = tasks.findIndex(u => !u.completed);
+    const nextTask = tasks[nextTaskIndex];
 
-    if (!nextUpgrade) {
+    // Calculate XP progress within current level
+    const currentLevelThreshold = level > 1 ? (level - 1) * 500 : 0;
+    const nextLevelThreshold = level * 500;
+    const xpInCurrentLevel = xp - currentLevelThreshold;
+    const xpNeededForLevel = nextLevelThreshold - currentLevelThreshold;
+    const progress = Math.round((xpInCurrentLevel / xpNeededForLevel) * 100);
+
+    if (!nextTask) {
         return (
             <div style={{
                 padding: '15px',
@@ -57,12 +63,12 @@ export const BakeryRenovation: React.FC = () => {
                 gap: '5px'
             }}>
                 <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontWeight: 'bold', color: '#212529', fontSize: '12px' }}>{nextUpgrade.name}</div>
+                    <div style={{ fontWeight: 'bold', color: '#212529', fontSize: '12px' }}>{nextTask.name}</div>
                 </div>
 
                 <button
                     ref={(el) => {
-                        if (el && coins >= nextUpgrade.cost) {
+                        if (el && coins >= nextTask.cost) {
                             el.onclick = () => {
                                 // Get button position (target for animation)
                                 const buttonRect = el.getBoundingClientRect();
@@ -77,26 +83,26 @@ export const BakeryRenovation: React.FC = () => {
                                     const fromY = coinsRect.top + coinsRect.height / 2;
 
                                     // Fly FROM coins TO button for spending
-                                    useGameStore.getState().addCoinAnimation(fromX, fromY, -nextUpgrade.cost, toX, toY);
+                                    useGameStore.getState().addCoinAnimation(fromX, fromY, -nextTask.cost, toX, toY);
                                 }
-                                purchaseUpgrade(nextUpgrade.id);
+                                completeTask(nextTask.id);
                             };
                         }
                     }}
-                    disabled={coins < nextUpgrade.cost}
+                    disabled={coins < nextTask.cost}
                     style={{
                         padding: '4px 10px',
                         border: 'none',
                         borderRadius: '15px',
-                        background: coins >= nextUpgrade.cost ? '#646cff' : '#adb5bd',
+                        background: coins >= nextTask.cost ? '#646cff' : '#adb5bd',
                         color: 'white',
-                        cursor: coins >= nextUpgrade.cost ? 'pointer' : 'not-allowed',
+                        cursor: coins >= nextTask.cost ? 'pointer' : 'not-allowed',
                         fontWeight: 'bold',
                         fontSize: '12px',
                         width: '100%'
                     }}
                 >
-                    {nextUpgrade.cost} 💰
+                    {nextTask.cost} 💰
                 </button>
             </div>
         </div>

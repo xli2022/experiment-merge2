@@ -2,18 +2,20 @@ import React, { useEffect } from 'react';
 import { DndContext, type DragEndEvent, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
 import { useGameStore } from '../store/gameStore';
 import { Cell } from './Cell';
-import { OrderBoard } from './OrderBoard';
-import { BakeryRenovation } from './BakeryRenovation';
+import { OrderPanel } from './OrderPanel';
+import { TaskPanel } from './TaskPanel';
 import { SpawnAnimation } from './SpawnAnimation';
 import { Notification } from './Notification';
 import { CoinAnimation } from './CoinAnimation';
 import { useAnimatedNumber } from '../hooks/useAnimatedNumber';
-import { ItemInfoPanel } from './ItemInfoPanel';
+import { ItemPanel } from './ItemPanel';
+import { SettingsPopup } from './SettingsPopup';
 
 
 export const Board: React.FC = () => {
-    const { grid, initGrid, moveItem, energy, coins, restoreEnergy, spawnAnimations, coinAnimations, processOfflineProgress } = useGameStore();
+    const { grid, initGrid, moveItem, energy, coins, level, xp, restoreEnergy, spawnAnimations, coinAnimations, processOfflineProgress } = useGameStore();
     const animatedCoins = useAnimatedNumber(coins, 800); // Match coin flying animation duration
+    const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
 
     useEffect(() => {
         initGrid(9, 7);
@@ -65,16 +67,33 @@ export const Board: React.FC = () => {
         }}>
             <div className="stats-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', fontWeight: 'bold' }}>
                 <div style={{ background: '#fff8e1', padding: '5px 10px', borderRadius: '15px', color: '#f57f17' }}>💰 {animatedCoins}</div>
-                <div style={{ fontSize: '16px', color: '#212529', fontWeight: 'bold' }}>Bakery Merge</div>
-                <div style={{ background: '#e3f2fd', padding: '5px 10px', borderRadius: '15px', color: '#1565c0' }}>⚡ {energy}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                    <div style={{ fontSize: '16px', color: '#212529', fontWeight: 'bold' }}>Bakery Merge</div>
+                    <div style={{ fontSize: '10px', color: '#6c757d' }}>Lv {level} • {xp} XP</div>
+                </div>
+                <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
+                    <div style={{ background: '#e3f2fd', padding: '5px 10px', borderRadius: '15px', color: '#1565c0' }}>⚡ {energy}</div>
+                    <button
+                        onClick={() => setIsSettingsOpen(true)}
+                        style={{
+                            background: 'none',
+                            border: 'none',
+                            fontSize: '18px',
+                            cursor: 'pointer',
+                            padding: '0 5px'
+                        }}
+                    >
+                        ⚙️
+                    </button>
+                </div>
             </div>
 
             <div style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'stretch', height: '160px' }}>
                 <div style={{ flex: '0 0 140px' }}>
-                    <BakeryRenovation />
+                    <TaskPanel />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                    <OrderBoard />
+                    <OrderPanel />
                 </div>
             </div>
 
@@ -94,7 +113,8 @@ export const Board: React.FC = () => {
             {coinAnimations.map((animation) => (
                 <CoinAnimation key={animation.id} animation={animation} />
             ))}
-            <ItemInfoPanel />
+            <ItemPanel />
+            <SettingsPopup isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
         </div>
     );
 };

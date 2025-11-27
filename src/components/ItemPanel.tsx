@@ -3,7 +3,7 @@ import { useGameStore } from '../store/gameStore';
 import { MERGE_CHAINS } from '../types/game';
 import { Trash2 } from 'lucide-react';
 
-export const ItemInfoPanel: React.FC = () => {
+export const ItemPanel: React.FC = () => {
     const { grid, selectedItemId, deleteItem } = useGameStore();
 
     // Find the selected item
@@ -55,7 +55,7 @@ export const ItemInfoPanel: React.FC = () => {
                     {itemName}
                 </div>
                 <div style={{ fontSize: '12px', color: '#6c757d' }}>
-                    Level {selectedItem.level}/{selectedItem.maxLevel}
+                    Level {selectedItem.level}/{itemConfig.maxLevel}
                     {isGenerator && <span style={{ marginLeft: '8px', color: '#28a745', fontWeight: '500' }}>• Tap to spawn</span>}
                 </div>
             </div>

@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { Item } from './Item';
 
-export const OrderBoard: React.FC = () => {
+export const OrderPanel: React.FC = () => {
     const { orders, generateOrder, completeOrder, grid } = useGameStore();
 
     useEffect(() => {

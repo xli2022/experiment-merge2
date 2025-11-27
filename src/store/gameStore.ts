@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { type GameState, type GridCell, type ItemType, type Order, type Upgrade, type SpawnAnimation, type Notification, MERGE_CHAINS } from '../types/game';
+import { type GameState, type Cell, type ItemType, type Order, type SpawnAnimation, type Notification, MERGE_CHAINS, GENERATOR_CONFIG, LEVEL_XP_THRESHOLDS, TASK_LIST } from '../types/game';
 
 
 
@@ -8,14 +8,14 @@ interface GameStore extends GameState {
     initGrid: (rows: number, cols: number) => void;
     moveItem: (fromId: string, toId: string) => void;
     deleteItem: (itemId: string) => void;
-    spawnItem: (cellId: string, type: ItemType) => void;
+    spawnItem: (cellId: string) => void;
     consumeEnergy: (amount: number) => boolean;
     addCurrency: (type: 'coins' | 'gems', amount: number) => void;
     setSelectedItem: (id: string | null) => void;
     generateOrder: () => void;
     completeOrder: (orderId: string) => void;
     restoreEnergy: (amount: number) => void;
-    purchaseUpgrade: (upgradeId: string) => void;
+    completeTask: (taskId: string) => void;
     addSpawnAnimation: (animation: SpawnAnimation) => void;
     removeSpawnAnimation: (id: string) => void;
     showNotification: (message: string, type: Notification['type']) => void;
@@ -25,16 +25,8 @@ interface GameStore extends GameState {
     processOfflineProgress: () => void;
 }
 
-const INITIAL_UPGRADES: Upgrade[] = [
-    { id: 'u1', name: 'Clean Floor', cost: 50, description: 'Sweep away the dust.', purchased: false },
-    { id: 'u2', name: 'Fix Counter', cost: 150, description: 'A sturdy place to work.', purchased: false },
-    { id: 'u3', name: 'New Sign', cost: 300, description: 'Attract more customers.', purchased: false },
-    { id: 'u4', name: 'Espresso Machine', cost: 500, description: 'Shiny and chrome.', purchased: false },
-    { id: 'u5', name: 'Display Case', cost: 800, description: 'Show off your pastries.', purchased: false },
-];
-
-const createGrid = (rows: number, cols: number): GridCell[] => {
-    const grid: GridCell[] = [];
+const createGrid = (rows: number, cols: number): Cell[] => {
+    const grid: Cell[] = [];
     for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
             grid.push({
@@ -60,7 +52,7 @@ export const useGameStore = create<GameStore>()(
             xp: 0,
             selectedItemId: null,
             orders: [],
-            upgrades: INITIAL_UPGRADES,
+            tasks: TASK_LIST.map(task => ({ ...task, completed: false })),
             spawnAnimations: [],
             notification: null,
             coinAnimations: [],
@@ -79,13 +71,13 @@ export const useGameStore = create<GameStore>()(
                     id: 'gen-1',
                     type: 'generator_coffee',
                     level: 1,
-                    maxLevel: 1,
+                    maxLevel: MERGE_CHAINS['generator_coffee'].maxLevel,
                 };
                 grid[centerIndex + 1].item = {
                     id: 'gen-2',
                     type: 'generator_bread',
                     level: 1,
-                    maxLevel: 1,
+                    maxLevel: MERGE_CHAINS['generator_bread'].maxLevel,
                 };
 
                 set({ grid });
@@ -136,7 +128,7 @@ export const useGameStore = create<GameStore>()(
                 set({ grid: newGrid });
             },
 
-            spawnItem: (cellId, type) => {
+            spawnItem: (cellId) => {
                 const { grid, energy, consumeEnergy, addSpawnAnimation, spawnAnimations, showNotification } = get();
 
                 if (energy <= 0) {
@@ -145,7 +137,7 @@ export const useGameStore = create<GameStore>()(
                 }
 
                 const generatorCell = grid.find(c => c.id === cellId);
-                if (!generatorCell) return;
+                if (!generatorCell || !generatorCell.item) return;
 
                 // Get cells that have pending spawns
                 const pendingSpawnCellIds = new Set(spawnAnimations.map(a => a.toCellId));
@@ -158,6 +150,26 @@ export const useGameStore = create<GameStore>()(
                 }
 
                 if (consumeEnergy(1)) {
+                    // Determine spawn type and level
+                    const generatorTypeConfig = GENERATOR_CONFIG[generatorCell.item.type];
+                    const generatorConfig = generatorTypeConfig ? generatorTypeConfig[generatorCell.item.level] : null;
+
+                    let type: ItemType = 'coffee'; // Default fallback
+                    let level = 1;
+
+                    if (generatorConfig) {
+                        const rand = Math.random();
+                        let cumulativeProb = 0;
+                        for (const itemConfig of generatorConfig.items) {
+                            cumulativeProb += itemConfig.probability;
+                            if (rand < cumulativeProb) {
+                                type = itemConfig.type;
+                                level = itemConfig.level || 1;
+                                break;
+                            }
+                        }
+                    }
+
                     // Find closest empty cell
                     const sortedCells = emptyCells.sort((a, b) => {
                         const distA = Math.abs(a.row - generatorCell.row) + Math.abs(a.col - generatorCell.col);
@@ -169,7 +181,7 @@ export const useGameStore = create<GameStore>()(
                     const newItem = {
                         id: crypto.randomUUID(),
                         type,
-                        level: 1,
+                        level,
                         maxLevel: MERGE_CHAINS[type].maxLevel,
                     };
 
@@ -241,7 +253,6 @@ export const useGameStore = create<GameStore>()(
                 const numItems = Math.floor(Math.random() * 3) + 1;
                 const items = [];
                 let totalRewardCoins = 0;
-                let totalRewardXp = 0;
 
                 for (let i = 0; i < numItems; i++) {
                     const types: ItemType[] = ['coffee', 'bread'];
@@ -249,13 +260,12 @@ export const useGameStore = create<GameStore>()(
                     const level = Math.floor(Math.random() * 3) + 1; // Level 1-3
                     items.push({ type, level });
                     totalRewardCoins += level * 10;
-                    totalRewardXp += level * 5;
                 }
 
                 const newOrder: Order = {
                     id: crypto.randomUUID(),
                     items,
-                    reward: { coins: totalRewardCoins, xp: totalRewardXp },
+                    reward: { coins: totalRewardCoins },
                 };
 
                 set({ orders: [...orders, newOrder] });
@@ -310,20 +320,57 @@ export const useGameStore = create<GameStore>()(
                 }
             },
 
-            purchaseUpgrade: (upgradeId) => {
-                const { coins, upgrades } = get();
-                const upgradeIndex = upgrades.findIndex(u => u.id === upgradeId);
-                if (upgradeIndex === -1) return;
+            completeTask: (taskId) => {
+                const { coins, tasks, level, xp } = get();
+                const taskIndex = tasks.findIndex(t => t.id === taskId);
+                if (taskIndex === -1) return;
 
-                const upgrade = upgrades[upgradeIndex];
-                if (coins >= upgrade.cost && !upgrade.purchased) {
-                    const newUpgrades = [...upgrades];
-                    newUpgrades[upgradeIndex] = { ...upgrade, purchased: true };
+                const task = tasks[taskIndex];
+                if (coins >= task.cost && !task.completed) {
+                    const newTasks = [...tasks];
+                    newTasks[taskIndex] = { ...task, completed: true };
+                    const newXp = xp + task.xp;
 
                     set({
-                        coins: coins - upgrade.cost,
-                        upgrades: newUpgrades
+                        coins: coins - task.cost,
+                        xp: newXp,
+                        tasks: newTasks
                     });
+
+                    // Check for level up
+                    if (level < LEVEL_XP_THRESHOLDS.length - 1) {
+                        const nextLevelThreshold = LEVEL_XP_THRESHOLDS[level];
+                        if (newXp >= nextLevelThreshold) {
+                            const newLevel = level + 1;
+                            set({ level: newLevel });
+
+                            // Spawn a random generator as reward
+                            const generatorTypes: ItemType[] = ['generator_coffee', 'generator_bread'];
+                            const randomGenerator = generatorTypes[Math.floor(Math.random() * generatorTypes.length)];
+
+                            // Find an empty cell
+                            const { grid } = get();
+                            const emptyCell = grid.find(cell => !cell.item);
+
+                            if (emptyCell) {
+                                const newGrid = [...grid];
+                                const cellIndex = newGrid.findIndex(c => c.id === emptyCell.id);
+                                newGrid[cellIndex] = {
+                                    ...emptyCell,
+                                    item: {
+                                        id: crypto.randomUUID(),
+                                        type: randomGenerator,
+                                        level: 1,
+                                        maxLevel: MERGE_CHAINS[randomGenerator].maxLevel
+                                    }
+                                };
+                                set({ grid: newGrid });
+                            }
+
+                            // Show notification
+                            get().showNotification(`🎉 Level Up! Now Level ${newLevel}!`, 'success');
+                        }
+                    }
                 }
             },
 
@@ -398,7 +445,7 @@ export const useGameStore = create<GameStore>()(
             level: state.level,
             xp: state.xp,
             orders: state.orders,
-            upgrades: state.upgrades,
+            tasks: state.tasks,
             lastEnergyUpdateTime: state.lastEnergyUpdateTime,
         }),
     }));

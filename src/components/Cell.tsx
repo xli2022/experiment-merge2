@@ -1,12 +1,12 @@
 import React from 'react';
 import { useDroppable } from '@dnd-kit/core';
-import type { GridCell } from '../types/game';
+import type { Cell as CellType } from '../types/game';
 import { Item } from './Item';
 
 import { useGameStore } from '../store/gameStore';
 
 interface CellProps {
-    cell: GridCell;
+    cell: CellType;
 }
 
 export const Cell: React.FC<CellProps> = ({ cell }) => {
@@ -43,8 +43,7 @@ export const Cell: React.FC<CellProps> = ({ cell }) => {
         if (wasSelectedRef.current && isSelected) {
             if (cell.item.type.startsWith('generator')) {
                 // Determine what to spawn based on generator type
-                const spawnType = cell.item.type === 'generator_coffee' ? 'coffee' : 'bread';
-                spawnItem(cell.id, spawnType);
+                spawnItem(cell.id);
             }
         }
     };
