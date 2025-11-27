@@ -12,19 +12,20 @@ import { ItemInfoPanel } from './ItemInfoPanel';
 
 
 export const Board: React.FC = () => {
-    const { grid, initGrid, moveItem, energy, coins, restoreEnergy, spawnAnimations, coinAnimations } = useGameStore();
+    const { grid, initGrid, moveItem, energy, coins, restoreEnergy, spawnAnimations, coinAnimations, processOfflineProgress } = useGameStore();
     const animatedCoins = useAnimatedNumber(coins, 800); // Match coin flying animation duration
 
     useEffect(() => {
         initGrid(9, 7);
+        processOfflineProgress();
 
-        // Restore 1 energy every minute
+        // Restore 1 energy every 10 seconds
         const interval = setInterval(() => {
             restoreEnergy(1);
-        }, 60000);
+        }, 10000);
 
         return () => clearInterval(interval);
-    }, [initGrid, restoreEnergy]);
+    }, [initGrid, restoreEnergy, processOfflineProgress]);
 
     const sensors = useSensors(
         useSensor(PointerSensor, {

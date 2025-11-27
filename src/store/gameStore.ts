@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { type GameState, type GridCell, type ItemType, type Order, type Upgrade, type SpawnAnimation, type Notification, MERGE_CHAINS } from '../types/game';
 
 
@@ -21,6 +22,7 @@ interface GameStore extends GameState {
     clearNotification: () => void;
     addCoinAnimation: (fromX: number, fromY: number, amount: number, toX?: number, toY?: number) => void;
     removeCoinAnimation: (id: string) => void;
+    processOfflineProgress: () => void;
 }
 
 const INITIAL_UPGRADES: Upgrade[] = [
@@ -46,317 +48,357 @@ const createGrid = (rows: number, cols: number): GridCell[] => {
     return grid;
 };
 
-export const useGameStore = create<GameStore>((set, get) => ({
-    grid: [],
-    energy: 100,
-    maxEnergy: 100,
-    coins: 0,
-    gems: 0,
-    level: 1,
-    xp: 0,
-    selectedItemId: null,
-    orders: [],
-    upgrades: INITIAL_UPGRADES,
-    spawnAnimations: [],
-    notification: null,
-    coinAnimations: [],
-
-    initGrid: (rows, cols) => {
-        // Initialize with some starter items
-        const grid = createGrid(rows, cols);
-
-        // Add generators
-        const centerIndex = Math.floor(grid.length / 2);
-        grid[centerIndex - 1].item = {
-            id: 'gen-1',
-            type: 'generator_coffee',
+export const useGameStore = create<GameStore>()(
+    persist(
+        (set, get) => ({
+            grid: [],
+            energy: 100,
+            maxEnergy: 100,
+            coins: 0,
+            gems: 0,
             level: 1,
-            maxLevel: 1,
-        };
-        grid[centerIndex + 1].item = {
-            id: 'gen-2',
-            type: 'generator_bread',
-            level: 1,
-            maxLevel: 1,
-        };
+            xp: 0,
+            selectedItemId: null,
+            orders: [],
+            upgrades: INITIAL_UPGRADES,
+            spawnAnimations: [],
+            notification: null,
+            coinAnimations: [],
+            lastEnergyUpdateTime: Date.now(),
 
-        set({ grid });
-    },
+            initGrid: (rows, cols) => {
+                // Check if grid is already initialized (from persistence)
+                if (get().grid.length > 0) return;
 
-    moveItem: (fromId, toId) => {
-        const { grid } = get();
-        const newGrid = [...grid];
-        const fromCellIndex = newGrid.findIndex((c) => c.id === fromId);
-        const toCellIndex = newGrid.findIndex((c) => c.id === toId);
+                // Initialize with some starter items
+                const grid = createGrid(rows, cols);
 
-        if (fromCellIndex === -1 || toCellIndex === -1 || fromId === toId) return;
+                // Add generators
+                const centerIndex = Math.floor(grid.length / 2);
+                grid[centerIndex - 1].item = {
+                    id: 'gen-1',
+                    type: 'generator_coffee',
+                    level: 1,
+                    maxLevel: 1,
+                };
+                grid[centerIndex + 1].item = {
+                    id: 'gen-2',
+                    type: 'generator_bread',
+                    level: 1,
+                    maxLevel: 1,
+                };
 
-        const fromCell = newGrid[fromCellIndex];
-        const toCell = newGrid[toCellIndex];
+                set({ grid });
+            },
 
-        if (!fromCell.item) return;
+            moveItem: (fromId, toId) => {
+                const { grid } = get();
+                const newGrid = [...grid];
+                const fromCellIndex = newGrid.findIndex((c) => c.id === fromId);
+                const toCellIndex = newGrid.findIndex((c) => c.id === toId);
 
-        // Case 1: Move to empty cell
-        if (!toCell.item) {
-            toCell.item = fromCell.item;
-            fromCell.item = null;
-        }
-        // Case 2: Merge
-        else if (
-            toCell.item.type === fromCell.item.type &&
-            toCell.item.level === fromCell.item.level &&
-            toCell.item.level < toCell.item.maxLevel
-        ) {
-            toCell.item = {
-                ...toCell.item,
-                level: toCell.item.level + 1,
-                id: crypto.randomUUID(), // New ID for merged item
-            };
-            fromCell.item = null;
-            // Select the newly merged item
-            set({ selectedItemId: toCell.item.id });
-            // TODO: Add XP or other merge effects
-        }
-        // Case 3: Swap (if not merging and not empty) - Optional, usually games just swap or bounce back
-        // For now, let's just swap if types are different or max level reached
-        else {
-            const temp = toCell.item;
-            toCell.item = fromCell.item;
-            fromCell.item = temp;
-        }
+                if (fromCellIndex === -1 || toCellIndex === -1 || fromId === toId) return;
 
-        set({ grid: newGrid });
-    },
+                const fromCell = newGrid[fromCellIndex];
+                const toCell = newGrid[toCellIndex];
 
-    spawnItem: (cellId, type) => {
-        const { grid, energy, consumeEnergy, addSpawnAnimation, spawnAnimations, showNotification } = get();
+                if (!fromCell.item) return;
 
-        if (energy <= 0) {
-            showNotification('⚡ Out of energy! Wait for it to recharge.', 'warning');
-            return;
-        }
-
-        const generatorCell = grid.find(c => c.id === cellId);
-        if (!generatorCell) return;
-
-        // Get cells that have pending spawns
-        const pendingSpawnCellIds = new Set(spawnAnimations.map(a => a.toCellId));
-
-        // Find empty cells that don't have pending spawns
-        const emptyCells = grid.filter(c => c.item === null && !pendingSpawnCellIds.has(c.id));
-        if (emptyCells.length === 0) return;
-
-        if (consumeEnergy(1)) {
-            // Find closest empty cell
-            const sortedCells = emptyCells.sort((a, b) => {
-                const distA = Math.abs(a.row - generatorCell.row) + Math.abs(a.col - generatorCell.col);
-                const distB = Math.abs(b.row - generatorCell.row) + Math.abs(b.col - generatorCell.col);
-                return distA - distB;
-            });
-
-            const targetCell = sortedCells[0];
-            const newItem = {
-                id: crypto.randomUUID(),
-                type,
-                level: 1,
-                maxLevel: MERGE_CHAINS[type].maxLevel,
-            };
-
-            // Create animation
-            const animation = {
-                id: crypto.randomUUID(),
-                item: newItem,
-                fromCellId: cellId,
-                toCellId: targetCell.id,
-                startTime: Date.now(),
-            };
-
-            addSpawnAnimation(animation);
-
-            // Add item to grid after animation completes (400ms)
-            setTimeout(() => {
-                const currentGrid = get().grid;
-                const newGrid = [...currentGrid];
-                const cellIndex = newGrid.findIndex(c => c.id === targetCell.id);
-
-                if (cellIndex !== -1 && !newGrid[cellIndex].item) {
-                    newGrid[cellIndex].item = newItem;
-                    set({ grid: newGrid });
+                // Case 1: Move to empty cell
+                if (!toCell.item) {
+                    toCell.item = fromCell.item;
+                    fromCell.item = null;
+                }
+                // Case 2: Merge
+                else if (
+                    toCell.item.type === fromCell.item.type &&
+                    toCell.item.level === fromCell.item.level &&
+                    toCell.item.level < toCell.item.maxLevel
+                ) {
+                    toCell.item = {
+                        ...toCell.item,
+                        level: toCell.item.level + 1,
+                        id: crypto.randomUUID(), // New ID for merged item
+                    };
+                    fromCell.item = null;
+                    // Select the newly merged item
+                    set({ selectedItemId: toCell.item.id });
+                    // TODO: Add XP or other merge effects
+                }
+                // Case 3: Swap (if not merging and not empty) - Optional, usually games just swap or bounce back
+                // For now, let's just swap if types are different or max level reached
+                else {
+                    const temp = toCell.item;
+                    toCell.item = fromCell.item;
+                    fromCell.item = temp;
                 }
 
-                // Remove animation
-                get().removeSpawnAnimation(animation.id);
-            }, 400);
-        }
-    },
+                set({ grid: newGrid });
+            },
 
-    consumeEnergy: (amount) => {
-        const { energy } = get();
-        if (energy >= amount) {
-            set({ energy: energy - amount });
-            return true;
-        }
-        return false;
-    },
+            spawnItem: (cellId, type) => {
+                const { grid, energy, consumeEnergy, addSpawnAnimation, spawnAnimations, showNotification } = get();
 
-    addCurrency: (type, amount) => {
-        set((state) => ({ [type]: state[type] + amount }));
-    },
+                if (energy <= 0) {
+                    showNotification('⚡ Out of energy! Wait for it to recharge.', 'warning');
+                    return;
+                }
 
-    setSelectedItem: (itemId) => {
-        set({ selectedItemId: itemId });
-    },
+                const generatorCell = grid.find(c => c.id === cellId);
+                if (!generatorCell) return;
 
-    deleteItem: (itemId) => {
-        const { grid, selectedItemId } = get();
-        const cell = grid.find(c => c.item?.id === itemId);
+                // Get cells that have pending spawns
+                const pendingSpawnCellIds = new Set(spawnAnimations.map(a => a.toCellId));
 
-        if (cell) {
-            const newGrid = [...grid];
-            const cellIndex = newGrid.findIndex(c => c.id === cell.id);
-            newGrid[cellIndex] = { ...newGrid[cellIndex], item: null };
-            set({
-                grid: newGrid,
-                selectedItemId: selectedItemId === itemId ? null : selectedItemId
-            });
-        }
-    },
+                // Find empty cells that don't have pending spawns
+                const emptyCells = grid.filter(c => c.item === null && !pendingSpawnCellIds.has(c.id));
+                if (emptyCells.length === 0) {
+                    showNotification('🚫 No space! Merge items to make room.', 'warning');
+                    return;
+                }
 
-    generateOrder: () => {
-        const { orders } = get();
-        if (orders.length >= 3) return; // Max 3 orders
+                if (consumeEnergy(1)) {
+                    // Find closest empty cell
+                    const sortedCells = emptyCells.sort((a, b) => {
+                        const distA = Math.abs(a.row - generatorCell.row) + Math.abs(a.col - generatorCell.col);
+                        const distB = Math.abs(b.row - generatorCell.row) + Math.abs(b.col - generatorCell.col);
+                        return distA - distB;
+                    });
 
-        // Generate 1 to 3 items for the order
-        const numItems = Math.floor(Math.random() * 3) + 1;
-        const items = [];
-        let totalRewardCoins = 0;
-        let totalRewardXp = 0;
+                    const targetCell = sortedCells[0];
+                    const newItem = {
+                        id: crypto.randomUUID(),
+                        type,
+                        level: 1,
+                        maxLevel: MERGE_CHAINS[type].maxLevel,
+                    };
 
-        for (let i = 0; i < numItems; i++) {
-            const types: ItemType[] = ['coffee', 'bread'];
-            const type = types[Math.floor(Math.random() * types.length)];
-            const level = Math.floor(Math.random() * 3) + 1; // Level 1-3
-            items.push({ type, level });
-            totalRewardCoins += level * 10;
-            totalRewardXp += level * 5;
-        }
+                    // Create animation
+                    const animation = {
+                        id: crypto.randomUUID(),
+                        item: newItem,
+                        fromCellId: cellId,
+                        toCellId: targetCell.id,
+                        startTime: Date.now(),
+                    };
 
-        const newOrder: Order = {
-            id: crypto.randomUUID(),
-            items,
-            reward: { coins: totalRewardCoins, xp: totalRewardXp },
-        };
+                    addSpawnAnimation(animation);
 
-        set({ orders: [...orders, newOrder] });
-    },
+                    // Add item to grid after animation completes (400ms)
+                    setTimeout(() => {
+                        const currentGrid = get().grid;
+                        const newGrid = [...currentGrid];
+                        const cellIndex = newGrid.findIndex(c => c.id === targetCell.id);
 
-    completeOrder: (orderId) => {
-        const { grid, orders, addCurrency } = get();
-        const orderIndex = orders.findIndex(o => o.id === orderId);
-        if (orderIndex === -1) return;
+                        if (cellIndex !== -1 && !newGrid[cellIndex].item) {
+                            newGrid[cellIndex].item = newItem;
+                            set({ grid: newGrid });
+                        }
 
-        const order = orders[orderIndex];
-        const newGrid = [...grid];
+                        // Remove animation
+                        get().removeSpawnAnimation(animation.id);
+                    }, 400);
+                }
+            },
 
-        // Check if we have ALL items
-        const itemIndices: number[] = [];
+            consumeEnergy: (amount) => {
+                const { energy } = get();
+                if (energy >= amount) {
+                    set({ energy: energy - amount, lastEnergyUpdateTime: Date.now() });
+                    return true;
+                }
+                return false;
+            },
 
-        for (const requiredItem of order.items) {
-            // Find an item that matches and hasn't been used yet for this order
-            const itemIndex = newGrid.findIndex((c, idx) =>
-                c.item?.type === requiredItem.type &&
-                c.item?.level === requiredItem.level &&
-                !itemIndices.includes(idx)
-            );
+            addCurrency: (type, amount) => {
+                set((state) => ({ [type]: state[type] + amount }));
+            },
 
-            if (itemIndex === -1) return; // Missing an item
-            itemIndices.push(itemIndex);
-        }
+            setSelectedItem: (itemId) => {
+                set({ selectedItemId: itemId });
+            },
 
-        // Remove items
-        itemIndices.forEach(idx => {
-            newGrid[idx].item = null;
-        });
+            deleteItem: (itemId) => {
+                const { grid, selectedItemId } = get();
+                const cell = grid.find(c => c.item?.id === itemId);
 
-        // Give rewards
-        addCurrency('coins', order.reward.coins);
-        // TODO: Add XP
+                if (cell) {
+                    const newGrid = [...grid];
+                    const cellIndex = newGrid.findIndex(c => c.id === cell.id);
+                    newGrid[cellIndex] = { ...newGrid[cellIndex], item: null };
+                    set({
+                        grid: newGrid,
+                        selectedItemId: selectedItemId === itemId ? null : selectedItemId
+                    });
+                }
+            },
 
-        // Remove order
-        const newOrders = [...orders];
-        newOrders.splice(orderIndex, 1);
+            generateOrder: () => {
+                const { orders } = get();
+                if (orders.length >= 3) return; // Max 3 orders
 
-        set({ grid: newGrid, orders: newOrders });
+                // Generate 1 to 3 items for the order
+                const numItems = Math.floor(Math.random() * 3) + 1;
+                const items = [];
+                let totalRewardCoins = 0;
+                let totalRewardXp = 0;
 
-        // Auto-refill
-        get().generateOrder();
-    },
+                for (let i = 0; i < numItems; i++) {
+                    const types: ItemType[] = ['coffee', 'bread'];
+                    const type = types[Math.floor(Math.random() * types.length)];
+                    const level = Math.floor(Math.random() * 3) + 1; // Level 1-3
+                    items.push({ type, level });
+                    totalRewardCoins += level * 10;
+                    totalRewardXp += level * 5;
+                }
 
-    restoreEnergy: (amount) => {
-        const { energy, maxEnergy } = get();
-        if (energy < maxEnergy) {
-            set({ energy: Math.min(energy + amount, maxEnergy) });
-        }
-    },
+                const newOrder: Order = {
+                    id: crypto.randomUUID(),
+                    items,
+                    reward: { coins: totalRewardCoins, xp: totalRewardXp },
+                };
 
-    purchaseUpgrade: (upgradeId) => {
-        const { coins, upgrades } = get();
-        const upgradeIndex = upgrades.findIndex(u => u.id === upgradeId);
-        if (upgradeIndex === -1) return;
+                set({ orders: [...orders, newOrder] });
+            },
 
-        const upgrade = upgrades[upgradeIndex];
-        if (coins >= upgrade.cost && !upgrade.purchased) {
-            const newUpgrades = [...upgrades];
-            newUpgrades[upgradeIndex] = { ...upgrade, purchased: true };
+            completeOrder: (orderId) => {
+                const { grid, orders, addCurrency } = get();
+                const orderIndex = orders.findIndex(o => o.id === orderId);
+                if (orderIndex === -1) return;
 
-            set({
-                coins: coins - upgrade.cost,
-                upgrades: newUpgrades
-            });
-        }
-    },
+                const order = orders[orderIndex];
+                const newGrid = [...grid];
 
-    addSpawnAnimation: (animation) => {
-        set((state) => ({
-            spawnAnimations: [...state.spawnAnimations, animation]
-        }));
-    },
+                // Check if we have ALL items
+                const itemIndices: number[] = [];
 
-    removeSpawnAnimation: (id) => {
-        set((state) => ({
-            spawnAnimations: state.spawnAnimations.filter(a => a.id !== id)
-        }));
-    },
+                for (const requiredItem of order.items) {
+                    // Find an item that matches and hasn't been used yet for this order
+                    const itemIndex = newGrid.findIndex((c, idx) =>
+                        c.item?.type === requiredItem.type &&
+                        c.item?.level === requiredItem.level &&
+                        !itemIndices.includes(idx)
+                    );
 
-    showNotification: (message, type) => {
-        const id = crypto.randomUUID();
-        set({ notification: { id, message, type } });
+                    if (itemIndex === -1) return; // Missing an item
+                    itemIndices.push(itemIndex);
+                }
 
-        // Auto-clear after 3 seconds
-        setTimeout(() => {
-            set((state) => state.notification?.id === id ? { notification: null } : {});
-        }, 3000);
-    },
+                // Remove items
+                itemIndices.forEach(idx => {
+                    newGrid[idx].item = null;
+                });
 
-    clearNotification: () => {
-        set({ notification: null });
-    },
+                // Give rewards
+                addCurrency('coins', order.reward.coins);
+                // TODO: Add XP
 
-    addCoinAnimation: (fromX, fromY, amount, toX, toY) => {
-        const id = crypto.randomUUID();
-        set((state) => ({
-            coinAnimations: [...state.coinAnimations, { id, fromX, fromY, amount, toX, toY, startTime: Date.now() }]
-        }));
+                // Remove order
+                const newOrders = [...orders];
+                newOrders.splice(orderIndex, 1);
 
-        // Remove animation after it completes (800ms)
-        setTimeout(() => {
-            get().removeCoinAnimation(id);
-        }, 800);
-    },
+                set({ grid: newGrid, orders: newOrders });
 
-    removeCoinAnimation: (id) => {
-        set((state) => ({
-            coinAnimations: state.coinAnimations.filter(a => a.id !== id)
-        }));
-    },
-}));
+                // Auto-refill
+                get().generateOrder();
+            },
+
+            restoreEnergy: (amount) => {
+                const { energy, maxEnergy } = get();
+                if (energy < maxEnergy) {
+                    set({ energy: Math.min(energy + amount, maxEnergy), lastEnergyUpdateTime: Date.now() });
+                }
+            },
+
+            purchaseUpgrade: (upgradeId) => {
+                const { coins, upgrades } = get();
+                const upgradeIndex = upgrades.findIndex(u => u.id === upgradeId);
+                if (upgradeIndex === -1) return;
+
+                const upgrade = upgrades[upgradeIndex];
+                if (coins >= upgrade.cost && !upgrade.purchased) {
+                    const newUpgrades = [...upgrades];
+                    newUpgrades[upgradeIndex] = { ...upgrade, purchased: true };
+
+                    set({
+                        coins: coins - upgrade.cost,
+                        upgrades: newUpgrades
+                    });
+                }
+            },
+
+            addSpawnAnimation: (animation) => {
+                set((state) => ({
+                    spawnAnimations: [...state.spawnAnimations, animation]
+                }));
+            },
+
+            removeSpawnAnimation: (id) => {
+                set((state) => ({
+                    spawnAnimations: state.spawnAnimations.filter(a => a.id !== id)
+                }));
+            },
+
+            showNotification: (message, type) => {
+                const id = crypto.randomUUID();
+                set({ notification: { id, message, type } });
+
+                // Auto-clear after 3 seconds
+                setTimeout(() => {
+                    set((state) => state.notification?.id === id ? { notification: null } : {});
+                }, 3000);
+            },
+
+            clearNotification: () => {
+                set({ notification: null });
+            },
+
+            addCoinAnimation: (fromX, fromY, amount, toX, toY) => {
+                const id = crypto.randomUUID();
+                set((state) => ({
+                    coinAnimations: [...state.coinAnimations, { id, fromX, fromY, amount, toX, toY, startTime: Date.now() }]
+                }));
+
+                // Remove animation after it completes (800ms)
+                setTimeout(() => {
+                    get().removeCoinAnimation(id);
+                }, 800);
+            },
+
+            removeCoinAnimation: (id) => {
+                set((state) => ({
+                    coinAnimations: state.coinAnimations.filter(a => a.id !== id)
+                }));
+            },
+
+            processOfflineProgress: () => {
+                const { lastEnergyUpdateTime, energy, maxEnergy } = get();
+                const now = Date.now();
+                const elapsed = now - lastEnergyUpdateTime;
+                const energyToRestore = Math.floor(elapsed / 10000); // 1 energy per 10 seconds
+
+                if (energyToRestore > 0 && energy < maxEnergy) {
+                    set({
+                        energy: Math.min(energy + energyToRestore, maxEnergy),
+                        lastEnergyUpdateTime: now // Reset timer to now (or could be last update + restored * 60000 to keep remainder)
+                    });
+                } else {
+                    // Just update the timestamp to keep it fresh if we didn't restore anything (e.g. full energy)
+                    set({ lastEnergyUpdateTime: now });
+                }
+            },
+        }), {
+        name: 'merge2-storage',
+        partialize: (state) => ({
+            grid: state.grid,
+            energy: state.energy,
+            maxEnergy: state.maxEnergy,
+            coins: state.coins,
+            gems: state.gems,
+            level: state.level,
+            xp: state.xp,
+            orders: state.orders,
+            upgrades: state.upgrades,
+            lastEnergyUpdateTime: state.lastEnergyUpdateTime,
+        }),
+    }));

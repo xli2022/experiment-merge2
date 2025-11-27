@@ -66,11 +66,34 @@ export interface GameState {
     spawnAnimations: SpawnAnimation[];
     notification: Notification | null;
     coinAnimations: CoinAnimation[];
+    lastEnergyUpdateTime: number;
 }
 
-export const MERGE_CHAINS: Record<ItemType, { maxLevel: number; name: string }> = {
-    coffee: { maxLevel: 6, name: 'Coffee' },
-    bread: { maxLevel: 6, name: 'Bread' },
+export const MERGE_CHAINS: Record<ItemType, { maxLevel: number; name: string; levelNames?: Record<number, string> }> = {
+    coffee: {
+        maxLevel: 6,
+        name: 'Coffee',
+        levelNames: {
+            1: 'Coffee Bean',
+            2: 'Ground Coffee',
+            3: 'Paper Cup',
+            4: 'Hot Coffee',
+            5: 'Latte',
+            6: 'Espresso Flight'
+        }
+    },
+    bread: {
+        maxLevel: 6,
+        name: 'Bread',
+        levelNames: {
+            1: 'Flour',
+            2: 'Dough',
+            3: 'Croissant',
+            4: 'Bagel',
+            5: 'Loaf',
+            6: 'Sandwich Platter'
+        }
+    },
     generator_coffee: { maxLevel: 1, name: 'Coffee Machine' },
     generator_bread: { maxLevel: 1, name: 'Bread Basket' },
 };

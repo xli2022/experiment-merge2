@@ -33,7 +33,7 @@ export const ItemInfoPanel: React.FC = () => {
     }
 
     const itemConfig = MERGE_CHAINS[selectedItem.type];
-    const itemName = itemConfig.name;
+    const itemName = itemConfig.levelNames?.[selectedItem.level] || itemConfig.name;
     const isGenerator = selectedItem.type.startsWith('generator');
 
     return (
