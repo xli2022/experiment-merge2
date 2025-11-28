@@ -1,8 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { type GameState, type Cell, type ItemType, type Order, type SpawnAnimation, type Notification, MERGE_CHAINS, GENERATOR_CONFIG, LEVEL_XP_THRESHOLDS, TASK_LIST } from '../types/game';
-
-
+import { type GameState, type Cell, type ItemType, type Order, type SpawnAnimation, type Notification } from '../types/game';
+import { ITEM_CONFIG, GENERATOR_CONFIG, TASK_LIST, LEVEL_CONFIG } from '../config';
 
 interface GameStore extends GameState {
     initGrid: (rows: number, cols: number) => void;
@@ -12,7 +11,7 @@ interface GameStore extends GameState {
     consumeEnergy: (amount: number) => boolean;
     addCurrency: (type: 'coins' | 'gems', amount: number) => void;
     setSelectedItem: (id: string | null) => void;
-    generateOrder: () => void;
+    generateOrder: () => boolean;
     completeOrder: (orderId: string) => void;
     restoreEnergy: (amount: number) => void;
     completeTask: (taskId: string) => void;
@@ -30,13 +29,26 @@ const createGrid = (rows: number, cols: number): Cell[] => {
     for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
             grid.push({
-                id: `${r} -${c} `,
+                id: `${r}-${c}`,
                 row: r,
                 col: c,
                 item: null,
             });
         }
     }
+
+    // Initial state: One Level 1 Bread Generator
+    const centerRow = Math.floor(rows / 2);
+    const centerCol = Math.floor(cols / 2);
+    const centerIndex = centerRow * cols + centerCol;
+
+    grid[centerIndex].item = {
+        id: crypto.randomUUID(),
+        type: 'generator_bread',
+        level: 1,
+        maxLevel: Object.keys(ITEM_CONFIG['generator_bread'].levels).length
+    };
+
     return grid;
 };
 
@@ -59,25 +71,19 @@ export const useGameStore = create<GameStore>()(
             lastEnergyUpdateTime: Date.now(),
 
             initGrid: (rows, cols) => {
-                // Check if grid is already initialized (from persistence)
-                if (get().grid.length > 0) return;
-
-                // Initialize with some starter items
+                // Initialize with empty grid
                 const grid = createGrid(rows, cols);
 
-                // Add generators
-                const centerIndex = Math.floor(grid.length / 2);
-                grid[centerIndex - 1].item = {
-                    id: 'gen-1',
-                    type: 'generator_coffee',
-                    level: 1,
-                    maxLevel: MERGE_CHAINS['generator_coffee'].maxLevel,
-                };
-                grid[centerIndex + 1].item = {
-                    id: 'gen-2',
+                // Initial state: One Level 1 Bread Generator
+                const centerRow = Math.floor(rows / 2);
+                const centerCol = Math.floor(cols / 2);
+                const centerIndex = centerRow * cols + centerCol;
+
+                grid[centerIndex].item = {
+                    id: crypto.randomUUID(),
                     type: 'generator_bread',
                     level: 1,
-                    maxLevel: MERGE_CHAINS['generator_bread'].maxLevel,
+                    maxLevel: Object.keys(ITEM_CONFIG['generator_bread'].levels).length
                 };
 
                 set({ grid });
@@ -151,8 +157,7 @@ export const useGameStore = create<GameStore>()(
 
                 if (consumeEnergy(1)) {
                     // Determine spawn type and level
-                    const generatorTypeConfig = GENERATOR_CONFIG[generatorCell.item.type];
-                    const generatorConfig = generatorTypeConfig ? generatorTypeConfig[generatorCell.item.level] : null;
+                    const generatorConfig = GENERATOR_CONFIG[generatorCell.item.type]?.[generatorCell.item.level];
 
                     let type: ItemType = 'coffee'; // Default fallback
                     let level = 1;
@@ -160,7 +165,7 @@ export const useGameStore = create<GameStore>()(
                     if (generatorConfig) {
                         const rand = Math.random();
                         let cumulativeProb = 0;
-                        for (const itemConfig of generatorConfig.items) {
+                        for (const itemConfig of generatorConfig) {
                             cumulativeProb += itemConfig.probability;
                             if (rand < cumulativeProb) {
                                 type = itemConfig.type;
@@ -182,7 +187,7 @@ export const useGameStore = create<GameStore>()(
                         id: crypto.randomUUID(),
                         type,
                         level,
-                        maxLevel: MERGE_CHAINS[type].maxLevel,
+                        maxLevel: Object.keys(ITEM_CONFIG[type].levels).length,
                     };
 
                     // Create animation
@@ -246,20 +251,66 @@ export const useGameStore = create<GameStore>()(
             },
 
             generateOrder: () => {
-                const { orders } = get();
-                if (orders.length >= 3) return; // Max 3 orders
+                const { orders, grid, level } = get();
+                const levelConfig = LEVEL_CONFIG[level] || LEVEL_CONFIG[10]; // Fallback to max level config
+                const maxOrdersForLevel = levelConfig.maxOrders;
+                if (orders.length >= maxOrdersForLevel) return false; // Max orders based on player level
 
-                // Generate 1 to 3 items for the order
-                const numItems = Math.floor(Math.random() * 3) + 1;
+                // 1. Identify active generators
+                const activeGenerators = new Set<string>();
+                grid.forEach(cell => {
+                    if (cell.item) {
+                        if (cell.item.type === 'generator_coffee') activeGenerators.add('coffee');
+                        if (cell.item.type === 'generator_bread') activeGenerators.add('bread');
+                        // Tea is produced by high-level coffee generators (level 2+)
+                        if (cell.item.type === 'generator_coffee' && cell.item.level >= 2) activeGenerators.add('tea');
+                    }
+                });
+
+                // 2. Filter items by rarity > 0 and prepare weighted selection
+                const viableItems = Array.from(activeGenerators)
+                    .filter(type => ITEM_CONFIG[type as ItemType].rarity > 0)
+                    .map(type => ({
+                        type: type as ItemType,
+                        rarity: ITEM_CONFIG[type as ItemType].rarity
+                    }));
+
+                if (viableItems.length === 0) return false; // No viable items to order
+
+                // Helper function for weighted random selection
+                const weightedRandom = (items: { type: ItemType; rarity: number }[]) => {
+                    const totalWeight = items.reduce((sum, item) => sum + item.rarity, 0);
+                    let random = Math.random() * totalWeight;
+                    for (const item of items) {
+                        random -= item.rarity;
+                        if (random <= 0) return item.type;
+                    }
+                    return items[items.length - 1].type; // Fallback
+                };
+
+                // 3. Generate items
+                const maxItemsPerOrder = 3; // Hardcoded
+                const rewardMultiplier = 10; // Hardcoded
+                const numItems = Math.floor(Math.random() * maxItemsPerOrder) + 1;
                 const items = [];
                 let totalRewardCoins = 0;
 
+                // Get level cap for current player level
+                const maxItemLevel = levelConfig.maxItemLevel;
+
                 for (let i = 0; i < numItems; i++) {
-                    const types: ItemType[] = ['coffee', 'bread'];
-                    const type = types[Math.floor(Math.random() * types.length)];
-                    const level = Math.floor(Math.random() * 3) + 1; // Level 1-3
-                    items.push({ type, level });
-                    totalRewardCoins += level * 10;
+                    const itemType = weightedRandom(viableItems);
+
+                    // Default max level is 6 if not capped by player level
+                    const itemMaxLevel = 6;
+                    const effectiveMaxLevel = Math.min(itemMaxLevel, maxItemLevel);
+                    // Default min level is 1
+                    const effectiveMinLevel = 1;
+
+                    const itemLevel = Math.floor(Math.random() * (effectiveMaxLevel - effectiveMinLevel + 1)) + effectiveMinLevel;
+
+                    items.push({ type: itemType, level: itemLevel });
+                    totalRewardCoins += itemLevel * rewardMultiplier;
                 }
 
                 const newOrder: Order = {
@@ -269,6 +320,7 @@ export const useGameStore = create<GameStore>()(
                 };
 
                 set({ orders: [...orders, newOrder] });
+                return true;
             },
 
             completeOrder: (orderId) => {
@@ -309,15 +361,18 @@ export const useGameStore = create<GameStore>()(
 
                 set({ grid: newGrid, orders: newOrders });
 
-                // Auto-refill
-                get().generateOrder();
+                // Auto-generate orders to fill up to maxOrders
+                const maxOrdersForLevel = (LEVEL_CONFIG[get().level] || LEVEL_CONFIG[10]).maxOrders;
+                while (get().orders.length < maxOrdersForLevel) {
+                    get().generateOrder();
+                }
             },
 
             restoreEnergy: (amount) => {
-                const { energy, maxEnergy } = get();
-                if (energy < maxEnergy) {
-                    set({ energy: Math.min(energy + amount, maxEnergy), lastEnergyUpdateTime: Date.now() });
-                }
+                const { energy } = get();
+                // Always bypass maxEnergy (for rewards and manual refills)
+                // Do NOT update lastEnergyUpdateTime - that's only for auto-refill tracking
+                set({ energy: energy + amount });
             },
 
             completeTask: (taskId) => {
@@ -338,37 +393,51 @@ export const useGameStore = create<GameStore>()(
                     });
 
                     // Check for level up
-                    if (level < LEVEL_XP_THRESHOLDS.length - 1) {
-                        const nextLevelThreshold = LEVEL_XP_THRESHOLDS[level];
+                    // LEVEL_CONFIG[N] contains the threshold and reward FOR reaching level N.
+                    // So to check if we can level up FROM current level, check LEVEL_CONFIG[level + 1].
+                    const nextLevelConfig = LEVEL_CONFIG[level + 1];
+                    if (nextLevelConfig) {
+                        const nextLevelThreshold = nextLevelConfig.xpThreshold;
                         if (newXp >= nextLevelThreshold) {
                             const newLevel = level + 1;
                             set({ level: newLevel });
 
-                            // Spawn a random generator as reward
-                            const generatorTypes: ItemType[] = ['generator_coffee', 'generator_bread'];
-                            const randomGenerator = generatorTypes[Math.floor(Math.random() * generatorTypes.length)];
+                            // Give reward if configured for reaching this new level
+                            const reward = nextLevelConfig.reward;
+                            if (reward) {
+                                // Find an empty cell
+                                const { grid } = get();
+                                const emptyCell = grid.find(cell => !cell.item);
 
-                            // Find an empty cell
-                            const { grid } = get();
-                            const emptyCell = grid.find(cell => !cell.item);
+                                if (emptyCell) {
+                                    const newGrid = [...grid];
+                                    const cellIndex = newGrid.findIndex(c => c.id === emptyCell.id);
+                                    newGrid[cellIndex] = {
+                                        ...emptyCell,
+                                        item: {
+                                            id: crypto.randomUUID(),
+                                            type: reward.type,
+                                            level: reward.level,
+                                            maxLevel: Object.keys(ITEM_CONFIG[reward.type].levels).length
+                                        }
+                                    };
+                                    set({ grid: newGrid });
 
-                            if (emptyCell) {
-                                const newGrid = [...grid];
-                                const cellIndex = newGrid.findIndex(c => c.id === emptyCell.id);
-                                newGrid[cellIndex] = {
-                                    ...emptyCell,
-                                    item: {
-                                        id: crypto.randomUUID(),
-                                        type: randomGenerator,
-                                        level: 1,
-                                        maxLevel: MERGE_CHAINS[randomGenerator].maxLevel
-                                    }
-                                };
-                                set({ grid: newGrid });
+                                    // Show notification with level
+                                    get().showNotification(`🎉 You are upgraded to level ${newLevel}!`, 'success');
+                                } else {
+                                    // Show notification for level up but no space for reward
+                                    get().showNotification(`🎉 You are upgraded to level ${newLevel}! (No space for reward)`, 'warning');
+                                }
+
+                                // Give energy reward silently (no separate notification)
+                                if (reward.energy) {
+                                    get().restoreEnergy(reward.energy);
+                                }
+                            } else {
+                                // Show notification just for level up
+                                get().showNotification(`🎉 You are upgraded to level ${newLevel}!`, 'success');
                             }
-
-                            // Show notification
-                            get().showNotification(`🎉 Level Up! Now Level ${newLevel}!`, 'success');
                         }
                     }
                 }

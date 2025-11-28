@@ -68,7 +68,7 @@ export const Item: React.FC<ItemProps> = ({ item, onClick, onPointerDown, isSele
             return (
                 <div style={{ position: 'relative' }}>
                     <Factory size={size} />
-                    <Zap size={16} style={{ position: 'absolute', top: -5, right: -10, fill: 'gold', color: 'gold' }} />
+                    <Zap size={16} style={{ position: 'absolute', top: -5, right: -10, fill: '#1565c0', color: '#1565c0' }} />
                 </div>
             );
         }
@@ -77,7 +77,7 @@ export const Item: React.FC<ItemProps> = ({ item, onClick, onPointerDown, isSele
             return (
                 <div style={{ position: 'relative' }}>
                     <CookingPot size={size} />
-                    <Zap size={16} style={{ position: 'absolute', top: -5, right: -10, fill: 'gold', color: 'gold' }} />
+                    <Zap size={16} style={{ position: 'absolute', top: -5, right: -10, fill: '#1565c0', color: '#1565c0' }} />
                 </div>
             );
         }
@@ -112,7 +112,7 @@ export const Item: React.FC<ItemProps> = ({ item, onClick, onPointerDown, isSele
                 renderIcon()
             )}
             {item.type.startsWith('generator') && (
-                <Zap size={16} style={{ position: 'absolute', top: 2, right: 2, fill: 'gold', color: 'gold' }} />
+                <Zap size={16} style={{ position: 'absolute', top: 2, right: 2, fill: '#1565c0', color: '#1565c0' }} />
             )}
             <span style={{ position: 'absolute', bottom: 2, right: 4, fontSize: '10px' }}>{item.level}</span>
             {isRequired && (

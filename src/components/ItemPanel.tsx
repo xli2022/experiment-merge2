@@ -1,6 +1,6 @@
 import React from 'react';
 import { useGameStore } from '../store/gameStore';
-import { MERGE_CHAINS } from '../types/game';
+import { ITEM_CONFIG } from '../config';
 import { Trash2 } from 'lucide-react';
 
 export const ItemPanel: React.FC = () => {
@@ -32,8 +32,9 @@ export const ItemPanel: React.FC = () => {
         );
     }
 
-    const itemConfig = MERGE_CHAINS[selectedItem.type];
-    const itemName = itemConfig.levelNames?.[selectedItem.level] || itemConfig.name;
+    const itemConfig = ITEM_CONFIG[selectedItem.type];
+    const itemName = itemConfig?.levels?.[selectedItem.level] || 'Unknown Item';
+    const maxLevel = itemConfig?.levels ? Object.keys(itemConfig.levels).length : 0;
     const isGenerator = selectedItem.type.startsWith('generator');
 
     return (
@@ -55,7 +56,7 @@ export const ItemPanel: React.FC = () => {
                     {itemName}
                 </div>
                 <div style={{ fontSize: '12px', color: '#6c757d' }}>
-                    Level {selectedItem.level}/{itemConfig.maxLevel}
+                    Level {selectedItem.level}/{maxLevel}
                     {isGenerator && <span style={{ marginLeft: '8px', color: '#28a745', fontWeight: '500' }}>• Tap to spawn</span>}
                 </div>
             </div>

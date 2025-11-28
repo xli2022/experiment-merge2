@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { type CoinAnimation as CoinAnimationType } from '../types/game';
+import { Circle } from 'lucide-react';
 
 interface CoinAnimationProps {
     animation: CoinAnimationType;
@@ -45,9 +46,15 @@ export const CoinAnimation: React.FC<CoinAnimationProps> = ({ animation }) => {
                 '--target-x': `${targetPos.x}px`,
                 '--target-y': `${targetPos.y}px`,
                 animation: 'coinFly 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                color: '#f57f17',
+                textShadow: '0 2px 4px rgba(0,0,0,0.2)'
             }}
         >
-            {animation.amount > 0 ? `💰 +${animation.amount}` : `💰 ${animation.amount}`}
+            <Circle size={24} fill="#f57f17" stroke="#f57f17" />
+            {animation.amount > 0 ? `+${animation.amount}` : `${animation.amount}`}
         </div>
     );
 };

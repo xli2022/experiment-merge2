@@ -1,18 +1,24 @@
 import React, { useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { Item } from './Item';
+import { Circle } from 'lucide-react';
+import { LEVEL_CONFIG } from '../config';
 
 export const OrderPanel: React.FC = () => {
-    const { orders, generateOrder, completeOrder, grid } = useGameStore();
+    const { orders, generateOrder, completeOrder, grid, level } = useGameStore();
 
     useEffect(() => {
-        // Generate initial orders if empty
-        if (orders.length === 0) {
-            generateOrder();
-            generateOrder();
-            generateOrder();
+        // Auto-generate orders up to maxOrders for current level
+        const maxOrdersForLevel = (LEVEL_CONFIG[level] || LEVEL_CONFIG[10]).maxOrders;
+        let attempts = 0;
+        const maxAttempts = 10; // Prevent infinite loop if generation fails repeatedly
+
+        while (orders.length < maxOrdersForLevel && attempts < maxAttempts) {
+            const success = generateOrder();
+            if (!success) break; // Stop if we can't generate an order (e.g. no generators)
+            attempts++;
         }
-    }, [orders.length, generateOrder]);
+    }, [orders.length, level, generateOrder]);
 
     // Helper to check if an item is available in the grid
     const checkAvailability = (orderItems: { type: any; level: number }[]) => {
@@ -188,8 +194,8 @@ export const OrderPanel: React.FC = () => {
                                         </div>
                                     ))}
                                 </div>
-                                <div style={{ fontSize: '12px', color: '#666' }}>
-                                    Reward: {order.reward.coins} 💰
+                                <div style={{ fontSize: '12px', color: '#666', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    Reward: {order.reward.coins} <Circle size={12} fill="#f57f17" stroke="#f57f17" />
                                 </div>
                                 <button
                                     ref={(el) => {
@@ -222,11 +228,6 @@ export const OrderPanel: React.FC = () => {
                             </div>
                         );
                     })}
-                {orders.length < 3 && (
-                    <button onClick={generateOrder} style={{ padding: '10px' }}>
-                        + New Order
-                    </button>
-                )}
             </div>
         </div>
     );
