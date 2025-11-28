@@ -74,4 +74,5 @@ export interface GameState {
     spawnAnimations: SpawnAnimation[];
     notification: Notification | null;
     coinAnimations: CoinAnimation[];
+    showEnergyPurchase: boolean;
 }

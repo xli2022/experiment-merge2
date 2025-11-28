@@ -10,11 +10,12 @@ import { CoinAnimation } from './CoinAnimation';
 import { useAnimatedNumber } from '../hooks/useAnimatedNumber';
 import { ItemPanel } from './ItemPanel';
 import { SettingsPopup } from './SettingsPopup';
+import { EnergyPurchasePopup } from './EnergyPurchasePopup';
 import { Zap, Circle } from 'lucide-react';
 
 
 export const Board: React.FC = () => {
-    const { grid, initGrid, moveItem, energy, coins, level, restoreEnergy, spawnAnimations, coinAnimations, processOfflineProgress } = useGameStore();
+    const { grid, initGrid, moveItem, energy, coins, gems, level, restoreEnergy, spawnAnimations, coinAnimations, processOfflineProgress } = useGameStore();
     const animatedCoins = useAnimatedNumber(coins, 800); // Match coin flying animation duration
     const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
 
@@ -73,6 +74,10 @@ export const Board: React.FC = () => {
             position: 'relative',
         }}>
             <div className="stats-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', fontWeight: 'bold' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ fontSize: '18px', color: '#212529', fontWeight: 'bold' }}>Bakery Merge</div>
+                    <div style={{ fontSize: '12px', color: '#6c757d', fontWeight: 'normal' }}>Level {level}</div>
+                </div>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                     <div style={{ background: '#e3f2fd', padding: '5px 10px', borderRadius: '15px', color: '#1565c0', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <Zap size={14} fill="#1565c0" /> {energy}
@@ -80,24 +85,19 @@ export const Board: React.FC = () => {
                     <div style={{ background: '#fff8e1', padding: '5px 10px', borderRadius: '15px', color: '#f57f17', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <Circle size={14} fill="#f57f17" stroke="#f57f17" /> {animatedCoins}
                     </div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                    <div style={{ fontSize: '16px', color: '#212529', fontWeight: 'bold' }}>Bakery Merge</div>
-                    <div style={{ fontSize: '10px', color: '#6c757d' }}>Level {level}</div>
-                </div>
-                <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
+                    <div style={{ background: '#f3e5f5', padding: '5px 10px', borderRadius: '15px', color: '#7b1fa2', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        💎 {gems}
+                    </div>
                     <button
                         onClick={() => setIsSettingsOpen(true)}
                         style={{
                             background: 'none',
                             border: 'none',
-                            fontSize: '18px',
                             cursor: 'pointer',
-                            padding: '0 5px'
+                            fontSize: '20px',
+                            padding: '4px 8px'
                         }}
-                    >
-                        ⚙️
-                    </button>
+                    >⚙️</button>
                 </div>
             </div>
 
@@ -127,6 +127,7 @@ export const Board: React.FC = () => {
                 <CoinAnimation key={animation.id} animation={animation} />
             ))}
             <ItemPanel />
+            <EnergyPurchasePopup />
             <SettingsPopup isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
         </div>
     );

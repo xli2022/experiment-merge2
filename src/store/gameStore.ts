@@ -15,6 +15,8 @@ interface GameStore extends GameState {
     completeOrder: (orderId: string) => void;
     restoreEnergy: (amount: number) => void;
     completeTask: (taskId: string) => void;
+    purchaseEnergy: () => void;
+    setShowEnergyPurchase: (show: boolean) => void;
     addSpawnAnimation: (animation: SpawnAnimation) => void;
     removeSpawnAnimation: (id: string) => void;
     showNotification: (message: string, type: Notification['type']) => void;
@@ -59,15 +61,17 @@ export const useGameStore = create<GameStore>()(
             energy: 100,
             maxEnergy: 100,
             coins: 0,
-            gems: 0,
+            gems: 100,
             level: 1,
             xp: 0,
             selectedItemId: null,
             orders: [],
             tasks: TASK_LIST.map(task => ({ ...task, completed: false })),
+            // UI state (non-persistent)
             spawnAnimations: [],
             notification: null,
             coinAnimations: [],
+            showEnergyPurchase: false,
             lastEnergyUpdateTime: Date.now(),
 
             initGrid: (rows, cols) => {
@@ -138,7 +142,10 @@ export const useGameStore = create<GameStore>()(
                 const { grid, energy, consumeEnergy, addSpawnAnimation, spawnAnimations, showNotification } = get();
 
                 if (energy <= 0) {
-                    showNotification('⚡ Out of energy! Wait for it to recharge.', 'warning');
+                    // Show purchase popup if player has enough gems
+                    if (get().gems >= 10) {
+                        set({ showEnergyPurchase: true });
+                    }
                     return;
                 }
 
@@ -221,7 +228,8 @@ export const useGameStore = create<GameStore>()(
             consumeEnergy: (amount) => {
                 const { energy } = get();
                 if (energy >= amount) {
-                    set({ energy: energy - amount, lastEnergyUpdateTime: Date.now() });
+                    const newEnergy = energy - amount;
+                    set({ energy: newEnergy, lastEnergyUpdateTime: Date.now() });
                     return true;
                 }
                 return false;
@@ -373,6 +381,22 @@ export const useGameStore = create<GameStore>()(
                 // Always bypass maxEnergy (for rewards and manual refills)
                 // Do NOT update lastEnergyUpdateTime - that's only for auto-refill tracking
                 set({ energy: energy + amount });
+            },
+
+            purchaseEnergy: () => {
+                const { gems, energy } = get();
+                if (gems >= 10) {
+                    set({
+                        gems: gems - 10,
+                        energy: energy + 100,
+                        showEnergyPurchase: false
+                    });
+                    get().showNotification('💎 Purchased 100 energy!', 'success');
+                }
+            },
+
+            setShowEnergyPurchase: (show) => {
+                set({ showEnergyPurchase: show });
             },
 
             completeTask: (taskId) => {

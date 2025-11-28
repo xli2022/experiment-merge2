@@ -10,22 +10,32 @@ export const CoinAnimation: React.FC<CoinAnimationProps> = ({ animation }) => {
     const [targetPos, setTargetPos] = useState<{ x: number; y: number } | null>(null);
 
     useEffect(() => {
-        // If explicit target coordinates are provided, use them
-        if (animation.toX !== undefined && animation.toY !== undefined) {
+        let targetX = animation.toX;
+        let targetY = animation.toY;
+
+        // If explicit target coordinates are NOT provided, calculate them
+        if (animation.toX === undefined || animation.toY === undefined) {
+            // Otherwise, calculate target based on amount (positive = coins display)
+            if (animation.amount > 0) {
+                // Fly to coins display (second badge in right group)
+                const coinsElement = document.querySelector('.stats-bar > div:last-child > div:nth-child(2)');
+                if (coinsElement) {
+                    const rect = coinsElement.getBoundingClientRect();
+                    targetX = rect.left + rect.width / 2;
+                    targetY = rect.top + rect.height / 2;
+                }
+            }
+        }
+
+        // Set the target position if valid coordinates were determined
+        if (targetX !== undefined && targetY !== undefined) {
             setTargetPos({
-                x: animation.toX - animation.fromX,
-                y: animation.toY - animation.fromY,
+                x: targetX - animation.fromX,
+                y: targetY - animation.fromY,
             });
         } else {
-            // Otherwise, calculate target based on amount (positive = coins display)
-            const coinsElement = document.querySelector('.stats-bar > div:first-child');
-            if (coinsElement) {
-                const rect = coinsElement.getBoundingClientRect();
-                setTargetPos({
-                    x: rect.left + rect.width / 2 - animation.fromX,
-                    y: rect.top + rect.height / 2 - animation.fromY,
-                });
-            }
+            // If no target could be determined, reset targetPos
+            setTargetPos(null);
         }
     }, [animation.fromX, animation.fromY, animation.amount, animation.toX, animation.toY]);
 

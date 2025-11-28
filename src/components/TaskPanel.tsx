@@ -99,7 +99,8 @@ export const TaskPanel: React.FC = () => {
                                 const toY = buttonRect.top + buttonRect.height / 2;
 
                                 // Get coins display position (source for animation)
-                                const coinsElement = document.querySelector('.stats-bar > div:first-child');
+                                // Coins is now the second badge in the right stats group
+                                const coinsElement = document.querySelector('.stats-bar > div:last-child > div:nth-child(2)');
                                 if (coinsElement) {
                                     const coinsRect = coinsElement.getBoundingClientRect();
                                     const fromX = coinsRect.left + coinsRect.width / 2;
