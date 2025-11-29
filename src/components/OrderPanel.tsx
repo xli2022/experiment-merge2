@@ -18,7 +18,7 @@ export const OrderPanel: React.FC = () => {
             if (!success) break; // Stop if we can't generate an order (e.g. no generators)
             attempts++;
         }
-    }, [orders.length, level, generateOrder]);
+    }, [orders.length, level, generateOrder, grid.length]);
 
     // Helper to check if an item is available in the grid
     const checkAvailability = (orderItems: { type: any; level: number }[]) => {

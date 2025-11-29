@@ -127,7 +127,7 @@ export const TaskPanel: React.FC = () => {
                         gap: '4px'
                     }}
                 >
-                    {nextTask.cost} <Circle size={14} fill="currentColor" stroke="currentColor" />
+                    {nextTask.cost} <Circle size={14} fill="#f57f17" stroke="#f57f17" />
                 </button>
             </div>
         </div>

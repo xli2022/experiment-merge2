@@ -460,7 +460,7 @@ export const useGameStore = create<GameStore>()(
                                 }
                             } else {
                                 // Show notification just for level up
-                                get().showNotification(`🎉 You are upgraded to level ${newLevel}!`, 'success');
+                                get().showNotification(`Level Up! You reached Level ${newLevel}!`, 'success');
                             }
                         }
                     }

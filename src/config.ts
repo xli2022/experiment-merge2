@@ -94,7 +94,7 @@ export const ITEM_CONFIG: Record<
     { rarity: number; levels: Record<number, string> }
 > = {
     coffee: {
-        rarity: 0.7,
+        rarity: 0.8,
         levels: {
             1: 'Coffee Bean',
             2: 'Ground Coffee',
@@ -105,7 +105,7 @@ export const ITEM_CONFIG: Record<
         }
     },
     tea: {
-        rarity: 0.3,
+        rarity: 0.2,
         levels: {
             1: 'Tea Leaf',
             2: 'Tea Bag',
