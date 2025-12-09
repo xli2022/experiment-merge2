@@ -14,9 +14,13 @@ export const Cell: React.FC<CellProps> = ({ cell }) => {
         id: cell.id,
         data: cell,
     });
-    const { selectedItemId, setSelectedItem, spawnItem, orders } = useGameStore();
+    const { selectedItemId, setSelectedItem, spawnItem, orders, mergeAnimations } = useGameStore();
     const isSelected = selectedItemId === cell.item?.id;
     const wasSelectedRef = React.useRef(false);
+
+    const isAnimating = React.useMemo(() => {
+        return mergeAnimations.some(a => a.fromCellId === cell.id);
+    }, [mergeAnimations, cell.id]);
 
     const isRequired = React.useMemo(() => {
         if (!cell.item) return false;
@@ -64,7 +68,7 @@ export const Cell: React.FC<CellProps> = ({ cell }) => {
                 boxShadow: isSelected ? 'inset 0 0 0 2px #2196f3' : 'none',
             }}
         >
-            {cell.item && (
+            {cell.item && !isAnimating && (
                 <Item
                     item={cell.item}
                     isSelected={isSelected}

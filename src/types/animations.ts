@@ -23,3 +23,11 @@ export interface CoinAnimation {
     toY?: number;
     startTime: number;
 }
+
+export interface MergeAnimation {
+    id: string;
+    item: Item;
+    fromCellId: string;
+    toCellId: string;
+    startTime: number;
+}

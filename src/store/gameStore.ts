@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { type GameState, type Cell, type ItemType, type Order, type SpawnAnimation, type Notification } from '../types/game';
+import { type GameState, type Cell, type ItemType, type Order, type SpawnAnimation, type Notification, type MergeAnimation } from '../types/game';
 import { ITEM_CONFIG, GENERATOR_CONFIG, TASK_LIST, LEVEL_CONFIG } from '../config';
 
 interface GameStore extends GameState {
@@ -24,6 +24,9 @@ interface GameStore extends GameState {
     addCoinAnimation: (fromX: number, fromY: number, amount: number, toX?: number, toY?: number) => void;
     removeCoinAnimation: (id: string) => void;
     processOfflineProgress: () => void;
+    mergeAllItems: (itemId: string) => void;
+    addMergeAnimation: (animation: MergeAnimation) => void;
+    removeMergeAnimation: (id: string) => void;
 }
 
 const createGrid = (rows: number, cols: number): Cell[] => {
@@ -69,6 +72,7 @@ export const useGameStore = create<GameStore>()(
             tasks: TASK_LIST.map(task => ({ ...task, completed: false })),
             // UI state (non-persistent)
             spawnAnimations: [],
+            mergeAnimations: [],
             notification: null,
             coinAnimations: [],
             showEnergyPurchase: false,
@@ -526,6 +530,182 @@ export const useGameStore = create<GameStore>()(
                     // Just update the timestamp to keep it fresh if we didn't restore anything (e.g. full energy)
                     set({ lastEnergyUpdateTime: now });
                 }
+            },
+
+            mergeAllItems: (itemId: string) => {
+                const { grid } = get();
+                const targetCell = grid.find(c => c.item?.id === itemId);
+
+                if (!targetCell?.item) return;
+
+                const { type, level, maxLevel } = targetCell.item;
+                if (level >= maxLevel) return; // Cannot merge matches if already max level
+
+                // Find all cells with matching items (same type, same level, not at max level)
+                const matchingCells = grid.filter(c =>
+                    c.item?.type === type &&
+                    c.item?.level === level
+                );
+
+                if (matchingCells.length < 2) return; // Need at least 2 to merge
+
+                // Algorithm: Greedy Nearest Neighbor
+                // 1. Prioritize selected item as a recipient.
+                // 2. For remaining items, pick one and find its closest neighbor.
+
+                let availableCells = [...matchingCells];
+                // Remove cells that are already max level (safety check, though filtered above)
+                // Filter is already done above.
+
+                const pairsToMerge: { recipientIdx: number, donorIdx: number, recipientCellId: string, donorCellId: string }[] = [];
+
+                // Helper to calculate squared distance
+                const getDistSq = (c1: Cell, c2: Cell) => Math.pow(c1.row - c2.row, 2) + Math.pow(c1.col - c2.col, 2);
+
+                while (availableCells.length >= 2) {
+                    let recipient: Cell;
+
+                    // 1. Try to pick selected item as recipient first
+                    const selectedIdx = availableCells.findIndex(c => c.item!.id === itemId);
+                    if (selectedIdx !== -1) {
+                        recipient = availableCells[selectedIdx];
+                        availableCells.splice(selectedIdx, 1);
+                    } else {
+                        // 2. Otherwise pick the first available one
+                        recipient = availableCells.shift()!;
+                    }
+
+                    // 3. Find closest donor
+                    let bestDonorIdx = -1;
+                    let minDiskSq = Infinity;
+
+                    for (let i = 0; i < availableCells.length; i++) {
+                        const dist = getDistSq(recipient, availableCells[i]);
+                        if (dist < minDiskSq) {
+                            minDiskSq = dist;
+                            bestDonorIdx = i;
+                        }
+                    }
+
+                    if (bestDonorIdx !== -1) {
+                        const donor = availableCells[bestDonorIdx];
+                        availableCells.splice(bestDonorIdx, 1);
+
+                        const recipientIdx = grid.findIndex(c => c.id === recipient.id);
+                        const donorIdx = grid.findIndex(c => c.id === donor.id);
+
+                        if (recipientIdx !== -1 && donorIdx !== -1) {
+                            pairsToMerge.push({
+                                recipientIdx,
+                                donorIdx,
+                                recipientCellId: recipient.id,
+                                donorCellId: donor.id
+                            });
+                        }
+                    } else {
+                        // Should technically not happen if length >= 1, but if it does, put recipient back? 
+                        // Or just break. If no donor found (e.g. empty list), we break loop.
+                        break;
+                    }
+                }
+
+                if (pairsToMerge.length === 0) return;
+
+                // 1. Create animations for all donor items flying to recipient items
+                const { addMergeAnimation } = get();
+                const animationDuration = 400; // ms
+
+                pairsToMerge.forEach(({ donorCellId, recipientCellId, donorIdx }) => {
+                    const donorItem = grid[donorIdx].item!;
+                    addMergeAnimation({
+                        id: crypto.randomUUID(),
+                        item: donorItem,
+                        fromCellId: donorCellId,
+                        toCellId: recipientCellId,
+                        startTime: Date.now()
+                    });
+                });
+
+                // 2. Schedule the actual state update after animation finishes
+                setTimeout(() => {
+                    const currentGrid = get().grid;
+                    const newGrid = [...currentGrid];
+                    let currentSelectedItemId = get().selectedItemId;
+                    let hasMergeHappened = false;
+
+                    pairsToMerge.forEach(({ recipientCellId, donorCellId }) => {
+                        // Re-verify items exist and didn't change during animation
+                        // (Technically user isn't interacting during this split second but good for safety)
+                        // Note: We used indices from the *original* grid find. 
+                        // But we should re-find indices in the current grid inside timeout to be safe?
+                        // For now assuming indices are stable as grid size doesn't change.
+
+                        // Actually, safer to find by ID again
+                        const rIdx = newGrid.findIndex(c => c.id === recipientCellId);
+                        const dIdx = newGrid.findIndex(c => c.id === donorCellId);
+
+                        if (rIdx !== -1 && dIdx !== -1 && newGrid[rIdx].item && newGrid[dIdx].item) {
+                            // Merge logic
+                            const newItem = {
+                                ...newGrid[rIdx].item!,
+                                level: level + 1,
+                                id: crypto.randomUUID(),
+                            };
+
+                            newGrid[rIdx] = { ...newGrid[rIdx], item: newItem };
+                            newGrid[dIdx] = { ...newGrid[dIdx], item: null };
+
+                            hasMergeHappened = true;
+
+                            // If original target was selected (or matching ID), select new item
+                            if (newGrid[rIdx].item!.type === type && currentSelectedItemId === itemId) {
+                                // Actually simplistic check. If the original selected item ID was merged, we need to track it
+                                // But `selectedItemId` from closure `itemId` is the one user clicked.
+                                // If user clicked an item and it became a recipient, we should select the result.
+
+                                // The `itemId` param is what we started with.
+                                // If the recipient cell contained `itemId`, then select new item.
+                                if (recipientCellId === targetCell!.id) { // targetCell from outside closure
+                                    currentSelectedItemId = newItem.id;
+                                }
+                            }
+                        }
+                    });
+
+                    if (hasMergeHappened) {
+                        set({
+                            grid: newGrid,
+                            selectedItemId: currentSelectedItemId
+                        });
+                    }
+
+                    // Cleanup animations
+                    // (We could clear generic "all merge animations" or track IDs. 
+                    // Since we don't return IDs easily here, let's just clear older ones or rely on component self-cleanup? 
+                    // No, store should cleanup. 
+                    // Let's implement auto-cleanup in the addMergeAnimation or here.
+                    // The array of pairs doesn't have animation IDs. Let's fix that.)
+
+                    // Actually, cleaner: just rely on `removeMergeAnimation` being called by the component?
+                    // Or just clear all merge animations after delay?
+                    // Component-driven cleanup is risky if component unmounts.
+                    // Timer-driven state cleanup is better.
+
+                    set({ mergeAnimations: [] }); // Simple cleanup for now.
+
+                }, animationDuration);
+            },
+
+            addMergeAnimation: (animation) => {
+                set((state) => ({
+                    mergeAnimations: [...state.mergeAnimations, animation]
+                }));
+            },
+
+            removeMergeAnimation: (id) => {
+                set((state) => ({
+                    mergeAnimations: state.mergeAnimations.filter(a => a.id !== id)
+                }));
             },
         }), {
         name: 'merge2-storage',

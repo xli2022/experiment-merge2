@@ -5,6 +5,7 @@ import { Cell } from './Cell';
 import { OrderPanel } from './OrderPanel';
 import { TaskPanel } from './TaskPanel';
 import { SpawnAnimation } from './SpawnAnimation';
+import { MergeAnimation } from './MergeAnimation';
 import { Notification } from './Notification';
 import { CoinAnimation } from './CoinAnimation';
 import { useAnimatedNumber } from '../hooks/useAnimatedNumber';
@@ -15,7 +16,7 @@ import { Zap, Circle } from 'lucide-react';
 
 
 export const Board: React.FC = () => {
-    const { grid, initGrid, moveItem, energy, coins, gems, level, restoreEnergy, spawnAnimations, coinAnimations, processOfflineProgress } = useGameStore();
+    const { grid, initGrid, moveItem, energy, coins, gems, level, restoreEnergy, spawnAnimations, mergeAnimations, coinAnimations, processOfflineProgress } = useGameStore();
     const animatedCoins = useAnimatedNumber(coins, 800); // Match coin flying animation duration
     const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
 
@@ -118,6 +119,9 @@ export const Board: React.FC = () => {
                     {/* Render spawn animations */}
                     {spawnAnimations.map((animation) => (
                         <SpawnAnimation key={animation.id} animation={animation} />
+                    ))}
+                    {mergeAnimations.map((animation) => (
+                        <MergeAnimation key={animation.id} animation={animation} />
                     ))}
                 </div>
             </DndContext>

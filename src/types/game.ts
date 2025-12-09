@@ -2,9 +2,9 @@
 // Re-exports from other type files
 // ============================================================================
 
-import type { SpawnAnimation, Notification, CoinAnimation } from './animations';
+import type { SpawnAnimation, Notification, CoinAnimation, MergeAnimation } from './animations';
 
-export type { SpawnAnimation, Notification, CoinAnimation };
+export type { SpawnAnimation, Notification, CoinAnimation, MergeAnimation };
 
 // ============================================================================
 // Core Game Types
@@ -72,6 +72,7 @@ export interface GameState {
 
     // UI state (non-persistent)
     spawnAnimations: SpawnAnimation[];
+    mergeAnimations: MergeAnimation[];
     notification: Notification | null;
     coinAnimations: CoinAnimation[];
     showEnergyPurchase: boolean;

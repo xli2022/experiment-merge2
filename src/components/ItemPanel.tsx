@@ -1,10 +1,10 @@
 import React from 'react';
 import { useGameStore } from '../store/gameStore';
 import { ITEM_CONFIG } from '../config';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Merge } from 'lucide-react';
 
 export const ItemPanel: React.FC = () => {
-    const { grid, selectedItemId, deleteItem } = useGameStore();
+    const { grid, selectedItemId, deleteItem, mergeAllItems } = useGameStore();
 
     // Find the selected item
     const selectedCell = grid.find(c => c.item?.id === selectedItemId);
@@ -60,29 +60,67 @@ export const ItemPanel: React.FC = () => {
                     {isGenerator && <span style={{ marginLeft: '8px', color: '#28a745', fontWeight: '500' }}>• Tap to spawn</span>}
                 </div>
             </div>
-            {!isGenerator && (
-                <button
-                    onClick={() => {
-                        deleteItem(selectedItem.id);
-                    }}
-                    style={{
-                        background: '#dc3545',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        padding: '8px 12px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        fontSize: '13px',
-                        fontWeight: '600',
-                    }}
-                >
-                    <Trash2 size={16} />
-                    Delete
-                </button>
-            )}
-        </div>
+
+            {
+                !isGenerator && (
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        {(() => {
+                            const matchingItems = grid.filter(c =>
+                                c.item?.type === selectedItem.type &&
+                                c.item?.level === selectedItem.level &&
+                                selectedItem.level < (selectedItem.maxLevel || 0)
+                            );
+
+                            if (matchingItems.length >= 2) {
+                                return (
+                                    <button
+                                        onClick={() => mergeAllItems(selectedItem.id)}
+                                        style={{
+                                            background: '#0d6efd',
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            padding: '8px 12px',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            fontSize: '13px',
+                                            fontWeight: '600',
+                                        }}
+                                    >
+                                        <Merge size={16} />
+                                        Merge All
+                                    </button>
+                                );
+                            }
+                            return null;
+                        })()}
+
+                        <button
+                            onClick={() => {
+                                deleteItem(selectedItem.id);
+                            }}
+                            style={{
+                                background: '#dc3545',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '8px',
+                                padding: '8px 12px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                fontSize: '13px',
+                                fontWeight: '600',
+                            }}
+                        >
+                            <Trash2 size={16} />
+                            Delete
+                        </button>
+                    </div>
+                )
+            }
+        </div >
     );
 };
